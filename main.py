@@ -1,5 +1,7 @@
 from fastapi import FastAPI
+
 app = FastAPI()
+
 @app.get("/")
 def home():
-    return {"mensaje": "Mi API esta funcionando"}
+    return {"mensaje": "API actualizada "}
