@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
 class Clase(BaseModel):
     id: int
