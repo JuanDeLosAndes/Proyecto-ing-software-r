@@ -1,0 +1,58 @@
+body {
+    font-family: Arial;
+    background: #f2f2f2;
+    text-align: center;
+}
+
+.top {
+    background: #2f4f6f;
+    color: white;
+    padding: 20px;
+}
+
+.menu {
+    margin-top: 50px;
+}
+
+.btn {
+    display: block;
+    width: 300px;
+    margin: 15px auto;
+    padding: 15px;
+    background: #3b6ea5;
+    color: white;
+    text-decoration: none;
+    border-radius: 10px;
+}
+
+.btn:hover {
+    background: #2c4e75;
+}
+
+.login-box {
+    margin-top: 100px;
+}
+
+input {
+    display: block;
+    margin: 10px auto;
+    padding: 10px;
+    width: 250px;
+}
+
+button {
+    padding: 10px 20px;
+    background: #3b6ea5;
+    color: white;
+    border: none;
+}
+
+table {
+    margin: 50px auto;
+    border-collapse: collapse;
+}
+
+td, th {
+    border: 1px solid #ccc;
+    padding: 15px;
+}
