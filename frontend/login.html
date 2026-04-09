@@ -2,28 +2,99 @@
 <html>
 <head>
     <title>Login</title>
-    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+            display: flex;
+            height: 100vh;
+        }
+
+        .left {
+            width: 30%;
+            background: #0d1b4c;
+        }
+
+        .right {
+            width: 70%;
+            background: #f2f2f2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .login-box {
+            text-align: center;
+        }
+
+        .icon {
+            width: 120px;
+            height: 120px;
+            background: #1c2f4a;
+            border-radius: 50%;
+            margin: auto;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: orange;
+            font-size: 40px;
+        }
+
+        input {
+            display: block;
+            margin: 10px auto;
+            padding: 10px;
+            width: 250px;
+            border-radius: 20px;
+            border: none;
+            background: #4f79a6;
+            color: white;
+            text-align: center;
+        }
+
+        input::placeholder {
+            color: white;
+        }
+
+        button {
+            margin-top: 10px;
+            padding: 10px 30px;
+            background: #4f79a6;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #35597c;
+        }
+    </style>
 </head>
+
 <body>
 
-<div class="login-box">
+<div class="left"></div>
 
-    <h2>Iniciar Sesión</h2>
+<div class="right">
+    <div class="login-box">
 
-    <input type="text" id="usuario" placeholder="Usuario">
-    <input type="password" id="password" placeholder="Contraseña">
+        <div class="icon">👥</div>
 
-    <button onclick="login()">Ingresar</button>
+        <input type="text" id="usuario" placeholder="USUARIO">
+        <input type="password" id="password" placeholder="CONTRASEÑA">
 
+        <button onclick="login()">INGRESAR</button>
+
+    </div>
 </div>
 
 <script>
 function login() {
-
     let user = document.getElementById("usuario").value;
     let pass = document.getElementById("password").value;
 
-    // Simulación (frontend)
     if(user === "admin" && pass === "1234"){
         window.location.href = "asignacion.html";
     } else {
