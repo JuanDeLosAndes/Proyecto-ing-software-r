@@ -7,6 +7,7 @@ app = FastAPI()
 
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
+
 class Clase(BaseModel):
     id: int
     nombre: str
@@ -32,6 +33,17 @@ class Clase(BaseModel):
 
 clases_db = []
 
+
+class Estudiante(BaseModel):
+    id: int
+    usuario: str
+    password: str
+    nombre: str
+    materias: list[str]
+
+estudiantes_db = []
+
+
 @app.get("/")
 def inicio():
     return {"mensaje": "API funcionando 🚀"}
@@ -44,10 +56,7 @@ def obtener_clases():
 def crear_clase(clase: Clase):
     for c in clases_db:
         if c["id"] == clase.id:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Ya existe una clase con id {clase.id}"
-            )
+            raise HTTPException(status_code=400, detail="ID de clase ya existe")
 
     clases_db.append(clase.dict())
     return {"mensaje": "Clase creada", "data": clase}
@@ -70,3 +79,29 @@ def buscar_clases(facultad: Optional[str] = None, activa: Optional[bool] = None)
         resultados = [c for c in resultados if c["activa"] == activa]
 
     return resultados
+
+
+
+@app.post("/estudiantes")
+def crear_estudiante(est: Estudiante):
+
+    for e in estudiantes_db:
+        if e["id"] == est.id:
+            raise HTTPException(status_code=400, detail="ID ya existe")
+
+        if e["usuario"] == est.usuario:
+            raise HTTPException(status_code=400, detail="Usuario ya existe")
+
+    estudiantes_db.append(est.dict())
+    return {"mensaje": "Estudiante creado", "data": est}
+
+
+
+@app.post("/login")
+def login(usuario: str, password: str):
+
+    for e in estudiantes_db:
+        if e["usuario"] == usuario and e["password"] == password:
+            return {"mensaje": "Login correcto", "usuario": e["nombre"]}
+
+    raise HTTPException(status_code=401, detail="Credenciales incorrectas")

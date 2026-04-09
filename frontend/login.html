@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Login</title>
+
     <style>
         body {
             margin: 0;
@@ -91,15 +92,29 @@
 </div>
 
 <script>
+const API = "https://clases-api-andresrr.azurewebsites.net";
+
 function login() {
+
     let user = document.getElementById("usuario").value;
     let pass = document.getElementById("password").value;
 
-    if(user === "admin" && pass === "1234"){
+    fetch(API + "/login?usuario=" + user + "&password=" + pass, {
+        method: "POST"
+    })
+    .then(res => {
+        if(!res.ok){
+            throw new Error("Error login");
+        }
+        return res.json();
+    })
+    .then(data => {
+        alert("Bienvenido " + data.usuario);
         window.location.href = "asignacion.html";
-    } else {
+    })
+    .catch(err => {
         alert("Usuario o contraseña incorrectos");
-    }
+    });
 }
 </script>
 
