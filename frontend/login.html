@@ -14,6 +14,36 @@
         .left {
             width: 30%;
             background: #0d1b4c;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* CUADRO SUPERIOR */
+        .top-msg {
+            height: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* LINEA AMARILLA */
+        .linea {
+            height: 2px;
+            background: yellow;
+        }
+
+        /* CUADRO INFERIOR */
+        .bottom-msg {
+            height: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 20px;
         }
 
         .right {
@@ -76,7 +106,19 @@
 
 <body>
 
-<div class="left"></div>
+<div class="left">
+
+    <div class="top-msg">
+        <p id="mensaje1">Bienvenido al sistema institucional</p>
+    </div>
+
+    <div class="linea"></div>
+
+    <div class="bottom-msg">
+        <p id="mensaje2">Recuerda revisar tu correo institucional</p>
+    </div>
+
+</div>
 
 <div class="right">
     <div class="login-box">
@@ -92,8 +134,10 @@
 </div>
 
 <script>
+
 const API = "https://clases-api-andresrr.azurewebsites.net";
 
+/* LOGIN */
 function login() {
 
     let user = document.getElementById("usuario").value;
@@ -116,6 +160,24 @@ function login() {
         alert("Usuario o contraseña incorrectos");
     });
 }
+
+/* MENSAJES DINÁMICOS */
+const mensajes = [
+    "Bienvenido al sistema de la Universidad Católica",
+    "Recuerda consultar el AVA regularmente",
+    "Revisa tu correo institucional para novedades",
+    "El sistema de asignación está disponible",
+    "Mantén tus datos actualizados"
+];
+
+let i = 0;
+
+setInterval(() => {
+    i = (i + 1) % mensajes.length;
+    document.getElementById("mensaje1").innerText = mensajes[i];
+    document.getElementById("mensaje2").innerText = mensajes[(i+1) % mensajes.length];
+}, 8000);
+
 </script>
 
 </body>
