@@ -1,32 +1,25 @@
-/* ===== GENERAL ===== */
+/* GENERAL */
 body {
     font-family: Arial;
-    margin: 0;
     background: #f2f2f2;
     text-align: center;
+    margin: 0;
+    padding-bottom: 200px; /* para que no tape la imagen */
 }
 
-/* ===== HEADER ===== */
+/* HEADER */
 .top {
     background: #2f4f6f;
     color: white;
     padding: 20px;
 }
 
-.top h2 {
-    margin: 0;
-}
-
-.top h3 {
-    margin: 5px 0 0 0;
-    font-weight: normal;
-}
-
-/* ===== MENÚ PRINCIPAL ===== */
+/* MENÚ */
 .menu {
     margin-top: 50px;
 }
 
+/* BOTONES */
 .btn {
     display: block;
     width: 300px;
@@ -36,115 +29,52 @@ body {
     color: white;
     text-decoration: none;
     border-radius: 10px;
-    transition: 0.3s;
 }
 
 .btn:hover {
     background: #2c4e75;
-    transform: scale(1.05);
 }
 
-/* ===== IMAGEN INFERIOR ===== */
-.imagen-inferior {
-    margin-top: 50px;
-}
-
-.imagen-inferior img {
-    width: 60%;
-    opacity: 0.85;
-    border-radius: 10px;
-}
-
-/* ===== LOGIN ===== */
+/* LOGIN */
 .login-box {
-    text-align: center;
+    margin-top: 100px;
 }
 
-.icon {
-    width: 120px;
-    height: 120px;
-    background: #1c2f4a;
-    border-radius: 50%;
-    margin: auto;
-    margin-bottom: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: orange;
-    font-size: 40px;
-}
-
-/* INPUTS */
 input {
     display: block;
     margin: 10px auto;
     padding: 10px;
     width: 250px;
-    border-radius: 20px;
-    border: none;
-    background: #4f79a6;
-    color: white;
-    text-align: center;
 }
 
-input::placeholder {
-    color: white;
-}
-
-/* BOTONES */
 button {
-    margin-top: 10px;
-    padding: 10px 25px;
+    padding: 10px 20px;
     background: #3b6ea5;
     color: white;
     border: none;
-    border-radius: 20px;
-    cursor: pointer;
-    transition: 0.3s;
 }
 
-button:hover {
-    background: #2c4e75;
-}
-
-/* ===== TABLA ASIGNACIÓN ===== */
+/* TABLA */
 table {
     margin: 50px auto;
     border-collapse: collapse;
-    width: 70%;
-    background: white;
-    border-radius: 10px;
-    overflow: hidden;
-}
-
-th {
-    background: #2f4f6f;
-    color: white;
 }
 
 td, th {
     border: 1px solid #ccc;
     padding: 15px;
-    text-align: center;
 }
 
-/* FILAS HOVER */
-tr:hover {
-    background: #f0f6ff;
+/* 👇 NUEVO: IMAGEN ABAJO */
+.imagen-inferior {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
 }
 
-/* ===== RESPONSIVE (opcional pero pro) ===== */
-@media (max-width: 768px) {
-
-    .btn {
-        width: 80%;
-    }
-
-    table {
-        width: 95%;
-    }
-
-    input {
-        width: 80%;
-    }
+.imagen-inferior img {
+    width: 100%;
+    height: 200px; /* puedes cambiar altura */
+    object-fit: cover;
 }
