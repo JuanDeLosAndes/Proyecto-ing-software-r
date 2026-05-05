@@ -1,15 +1,19 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, field_validator
-from typing import Optional
+from fastapi import FastAPI, HTTPException, Depends
+from sqlmodel import SQLModel, Field, Session, select
+from typing import Optional, List
 from fastapi.staticfiles import StaticFiles
+from pydantic import field_validator
+from database import engine, create_db_and_tables, get_session
 
 app = FastAPI()
 
+# Montar archivos estáticos
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
+# --- MODELOS DE DATOS (SQLModel) ---
 
-class Clase(BaseModel):
-    id: int
+class Clase(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
     nombre: str
     activa: bool
     horario: float
@@ -30,78 +34,86 @@ class Clase(BaseModel):
             raise ValueError("La capacidad no puede ser mayor a 35")
         return value
 
-
-clases_db = []
-
-
-class Estudiante(BaseModel):
-    id: int
-    usuario: str
+class Estudiante(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    usuario: str = Field(index=True, unique=True)
     password: str
     nombre: str
-    materias: list[str]
+    # Nota: SQLite no soporta listas directamente. 
+    # Para este nivel, guardaremos materias como un string simple o tabla aparte luego.
+    materias: Optional[str] = None 
 
-estudiantes_db = []
+# --- EVENTOS DE INICIO ---
 
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
+
+# --- RUTAS DE LA API ---
 
 @app.get("/")
 def inicio():
-    return {"mensaje": "API funcionando 🚀"}
+    return {"mensaje": "API con Persistencia SQLModel funcionando 🚀"}
 
-@app.get("/clases")
-def obtener_clases():
-    return clases_db
+@app.get("/clases", response_model=List[Clase])
+def obtener_clases(session: Session = Depends(get_session)):
+    clases = session.exec(select(Clase)).all()
+    return clases
 
 @app.post("/clases")
-def crear_clase(clase: Clase):
-    for c in clases_db:
-        if c["id"] == clase.id:
-            raise HTTPException(status_code=400, detail="ID de clase ya existe")
-
-    clases_db.append(clase.dict())
+def crear_clase(clase: Clase, session: Session = Depends(get_session)):
+    # Verificar si el ID ya existe manualmente si se envía uno
+    db_clase = session.get(Clase, clase.id)
+    if db_clase:
+        raise HTTPException(status_code=400, detail="ID de clase ya existe")
+    
+    session.add(clase)
+    session.commit()
+    session.refresh(clase)
     return {"mensaje": "Clase creada", "data": clase}
 
-@app.get("/clases/{id}")
-def obtener_clase(id: int):
-    for clase in clases_db:
-        if clase["id"] == id:
-            return clase
-    raise HTTPException(status_code=404, detail="Clase no encontrada")
+@app.get("/clases/{id}", response_model=Clase)
+def obtener_clase(id: int, session: Session = Depends(get_session)):
+    clase = session.get(Clase, id)
+    if not clase:
+        raise HTTPException(status_code=404, detail="Clase no encontrada")
+    return clase
 
-@app.get("/buscar")
-def buscar_clases(facultad: Optional[str] = None, activa: Optional[bool] = None):
-    resultados = clases_db
-
+@app.get("/buscar", response_model=List[Clase])
+def buscar_clases(
+    facultad: Optional[str] = None, 
+    activa: Optional[bool] = None, 
+    session: Session = Depends(get_session)
+):
+    statement = select(Clase)
     if facultad:
-        resultados = [c for c in resultados if c["facultad"] == facultad]
-
+        statement = statement.where(Clase.facultad == facultad)
     if activa is not None:
-        resultados = [c for c in resultados if c["activa"] == activa]
-
+        statement = statement.where(Clase.activa == activa)
+    
+    resultados = session.exec(statement).all()
     return resultados
 
-
-
 @app.post("/estudiantes")
-def crear_estudiante(est: Estudiante):
+def crear_estudiante(est: Estudiante, session: Session = Depends(get_session)):
+    # Verificar duplicados por ID o Usuario
+    statement = select(Estudiante).where((Estudiante.id == est.id) | (Estudiante.usuario == est.usuario))
+    existe = session.exec(statement).first()
+    
+    if existe:
+        raise HTTPException(status_code=400, detail="ID o Usuario ya existe")
 
-    for e in estudiantes_db:
-        if e["id"] == est.id:
-            raise HTTPException(status_code=400, detail="ID ya existe")
-
-        if e["usuario"] == est.usuario:
-            raise HTTPException(status_code=400, detail="Usuario ya existe")
-
-    estudiantes_db.append(est.dict())
+    session.add(est)
+    session.commit()
+    session.refresh(est)
     return {"mensaje": "Estudiante creado", "data": est}
 
-
-
 @app.post("/login")
-def login(usuario: str, password: str):
-
-    for e in estudiantes_db:
-        if e["usuario"] == usuario and e["password"] == password:
-            return {"mensaje": "Login correcto", "usuario": e["nombre"]}
+def login(usuario: str, password: str, session: Session = Depends(get_session)):
+    statement = select(Estudiante).where(Estudiante.usuario == usuario, Estudiante.password == password)
+    estudiante = session.exec(statement).first()
+    
+    if estudiante:
+        return {"mensaje": "Login correcto", "usuario": estudiante.nombre}
 
     raise HTTPException(status_code=401, detail="Credenciales incorrectas")

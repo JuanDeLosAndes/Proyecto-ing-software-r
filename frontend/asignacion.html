@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Asignación de Salones</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+        }
+
+        /* CONTENEDOR */
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* IZQUIERDA */
+        .left {
+            width: 30%;
+            background: #0d1b4c;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* CUADRO SUPERIOR */
+        .top-box {
+            height: 50%;
+            color: white;
+
+            padding: 25px;
+            margin: 10px;
+            border: 2px solid #4f79a6;
+            border-radius: 10px;
+
+            text-align: justify;
+            font-size: 14px;
+
+            box-sizing: border-box;
+        }
+
+        /* LINEA */
+        .linea {
+            height: 2px;
+            background: yellow;
+        }
+
+        /* CUADRO INFERIOR (IMAGEN) */
+        .bottom-box {
+            height: 50%;
+            position: relative;
+
+            padding: 25px;
+            margin: 10px;
+            border: 2px solid #4f79a6;
+            border-radius: 10px;
+
+            color: white;
+            text-align: justify;
+            font-size: 14px;
+
+            box-sizing: border-box;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            overflow: hidden;
+        }
+
+        .bottom-box img {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.3;
+            z-index: 1;
+        }
+
+        .bottom-box p {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* DERECHA */
+        .right {
+            width: 70%;
+            background: #f2f2f2;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        /* TABLA */
+        table {
+            margin: auto;
+            border-collapse: collapse;
+        }
+
+        td, th {
+            border: 1px solid #ccc;
+            padding: 20px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        th {
+            background: #3b6ea5;
+            color: white;
+        }
+
+        /* MATERIA */
+        .materia {
+            background: #4f79a6;
+            color: white;
+            border-radius: 5px;
+            padding: 5px;
+        }
+
+        /* TOOLTIP */
+        .tooltip {
+            visibility: hidden;
+            background: #1c2f4a;
+            color: white;
+            text-align: left;
+            padding: 10px;
+            border-radius: 5px;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 200px;
+            z-index: 1;
+        }
+
+        td:hover .tooltip {
+            visibility: visible;
+        }
+
+        /* BOTÓN */
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #3b6ea5;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #2c4e75;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- IZQUIERDA -->
+    <div class="left">
+
+        <div class="top-box">
+            <h3>¿Cómo funciona?</h3>
+
+            <p>
+                Este sistema permite visualizar la asignación de salones de manera organizada
+                según horarios y días de la semana.
+            </p>
+
+            <p>
+                Cada bloque representa una materia. Al pasar el cursor sobre ella,
+                se muestra información detallada como semestre, salón, horario y créditos.
+            </p>
+
+            <p>
+                Esto permite optimizar el uso de espacios y evitar conflictos académicos.
+            </p>
+        </div>
+
+        <div class="linea"></div>
+
+        <div class="bottom-box">
+            <img id="imagen" src="img/uni1.png">
+
+            <p id="mensaje">
+                La Universidad Católica de Colombia cuenta con acreditación de alta calidad,
+                garantizando excelencia académica. La facultad de ingeniería ha optimizado
+                su plan de estudios, pasando de 10 a 8 semestres para mejorar la formación profesional.
+            </p>
+        </div>
+
+    </div>
+
+    <!-- DERECHA -->
+    <div class="right">
+
+        <h1>Asignación de Salones</h1>
+
+        <table>
+            <tr>
+                <th>Hora</th>
+                <th>Lunes</th>
+                <th>Martes</th>
+                <th>Miércoles</th>
+                <th>Jueves</th>
+                <th>Viernes</th>
+            </tr>
+
+            <tr>
+                <td>7:00</td>
+
+                <td>
+                    <div class="materia">Matemáticas</div>
+                    <div class="tooltip">
+                        Semestre: 1<br>
+                        Salón: 101<br>
+                        Horario: 7:00 - 9:00<br>
+                        Créditos: 3
+                    </div>
+                </td>
+
+                <td></td>
+
+                <td>
+                    <div class="materia">Física</div>
+                    <div class="tooltip">
+                        Semestre: 2<br>
+                        Salón: 202<br>
+                        Horario: 7:00 - 9:00<br>
+                        Créditos: 4
+                    </div>
+                </td>
+
+                <td></td>
+                <td></td>
+            </tr>
+
+            <tr>
+                <td>9:00</td>
+
+                <td></td>
+
+                <td>
+                    <div class="materia">Programación</div>
+                    <div class="tooltip">
+                        Semestre: 3<br>
+                        Salón: 303<br>
+                        Horario: 9:00 - 11:00<br>
+                        Créditos: 4
+                    </div>
+                </td>
+
+                <td></td>
+
+                <td>
+                    <div class="materia">Bases de Datos</div>
+                    <div class="tooltip">
+                        Semestre: 4<br>
+                        Salón: 404<br>
+                        Horario: 9:00 - 11:00<br>
+                        Créditos: 3
+                    </div>
+                </td>
+
+                <td></td>
+            </tr>
+        </table>
+
+        <button onclick="logout()">Cerrar sesión</button>
+
+    </div>
+
+</div>
+
+<script>
+
+/* IMÁGENES ROTATIVAS */
+const imagenes = [
+    "img/uni1.png",
+    "img/uni2.png",
+    "img/uni3.png"
+];
+
+let i = 0;
+
+setInterval(() => {
+    i = (i + 1) % imagenes.length;
+    document.getElementById("imagen").src = imagenes[i];
+}, 8000);
+
+/* LOGOUT */
+function logout(){
+    window.location.href = "login.html";
+}
+
+</script>
+
+</body>
+</html>
