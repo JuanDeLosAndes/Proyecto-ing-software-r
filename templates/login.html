@@ -63,7 +63,6 @@ function login() {
     })
     .then(data => {
         alert("Bienvenido " + data.usuario);
-        // Redirigir a la ruta de FastAPI
         window.location.href = "/asignacion";
     })
     .catch(err => {
@@ -79,7 +78,6 @@ const mensajes = [
     "La plataforma PAW permite gestionar procesos académicos y administrativos de manera rápida y organizada."
 ];
 
-// Arreglo de rutas estáticas para JS
 const imagenes = [
     "/static/img/uni1.jpg",
     "/static/img/uni2.jpg",

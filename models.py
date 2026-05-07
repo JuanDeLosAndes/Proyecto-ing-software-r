@@ -2,7 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
 from pydantic import field_validator
 
-# --- ENTIDADES BASE DE USUARIOS ---
+
 
 class Rol(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -31,7 +31,6 @@ class Profesor(SQLModel, table=True):
     especialidad: str
     id_usuario: Optional[int] = Field(default=None, foreign_key="usuario.id")
 
-# --- ENTIDADES ACADÉMICAS ---
 
 class Materia(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -66,7 +65,7 @@ class Inscripcion(SQLModel, table=True):
     id_materia: Optional[int] = Field(default=None, foreign_key="materia.id")
     estado: str
 
-# Entidad para la configuración del Front (Administrador)
+
 class ConfiguracionFront(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     mensaje_bienvenida: str
