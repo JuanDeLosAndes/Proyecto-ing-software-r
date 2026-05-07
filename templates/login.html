@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <style>
+        body { margin: 0; font-family: Arial; display: flex; height: 100vh; }
+        .left { width: 30%; background: #0d1b4c; display: flex; flex-direction: column; }
+        .top-msg { height: 50%; display: flex; justify-content: center; align-items: center; color: white; text-align: justify; padding: 30px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; font-size: 14px; box-sizing: border-box; }
+        .linea { height: 2px; background: yellow; }
+        .bottom-msg { height: 50%; position: relative; display: flex; justify-content: center; align-items: center; color: white; text-align: justify; padding: 30px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; font-size: 14px; box-sizing: border-box; overflow: hidden; }
+        .bottom-msg img { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0.3; z-index: 1; }
+        .bottom-msg p { position: relative; z-index: 2; }
+        .right { width: 70%; background: #f2f2f2; display: flex; justify-content: center; align-items: center; }
+        .login-box { text-align: center; }
+        .icon { width: 120px; height: 120px; background: #1c2f4a; border-radius: 50%; margin: auto; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; color: orange; font-size: 40px; }
+        input { display: block; margin: 10px auto; padding: 10px; width: 250px; border-radius: 20px; border: none; background: #4f79a6; color: white; text-align: center; }
+        input::placeholder { color: white; }
+        button { margin-top: 10px; padding: 10px 30px; background: #4f79a6; color: white; border: none; border-radius: 20px; cursor: pointer; }
+        button:hover { background: #35597c; }
+    </style>
+</head>
+<body>
+
+<div class="left">
+    <div class="top-msg">
+        <p id="mensaje1">
+            Bienvenido al sistema institucional de la Universidad Católica de Colombia. 
+            Ingresa con tus credenciales oficiales para acceder a los servicios académicos.
+        </p>
+    </div>
+    <div class="linea"></div>
+    <div class="bottom-msg">
+        <img id="imagen" src="{{ url_for('static', path='img/uni1.jpg') }}">
+        <p id="mensaje2">
+            Recuerda revisar constantemente tu correo institucional y el Campus AVA 
+            para mantenerte informado sobre tus clases y actividades académicas.
+        </p>
+    </div>
+</div>
+
+<div class="right">
+    <div class="login-box">
+        <div class="icon">👥</div>
+        <input type="text" id="usuario" placeholder="USUARIO">
+        <input type="password" id="password" placeholder="CONTRASEÑA">
+        <button onclick="login()">INGRESAR</button>
+    </div>
+</div>
+
+<script>
+const API = "https://clases-api-andresrr.azurewebsites.net";
+
+function login() {
+    let user = document.getElementById("usuario").value;
+    let pass = document.getElementById("password").value;
+
+    fetch(API + "/login?usuario=" + user + "&password=" + pass, {
+        method: "POST"
+    })
+    .then(res => {
+        if(!res.ok) throw new Error("Error login");
+        return res.json();
+    })
+    .then(data => {
+        alert("Bienvenido " + data.usuario);
+        // Redirigir a la ruta de FastAPI
+        window.location.href = "/asignacion";
+    })
+    .catch(err => {
+        alert("Usuario o contraseña incorrectos");
+    });
+}
+
+const mensajes = [
+    "Bienvenido al sistema institucional de la Universidad Católica de Colombia. Accede con tus credenciales para gestionar tus actividades académicas.",
+    "El sistema de asignación de salones permite optimizar el uso de espacios teniendo en cuenta horarios, capacidad y facultad.",
+    "Consulta regularmente el Campus AVA para revisar materiales, tareas y actividades asignadas por tus docentes.",
+    "Revisa tu correo institucional para mantenerte informado sobre comunicados importantes y novedades académicas.",
+    "La plataforma PAW permite gestionar procesos académicos y administrativos de manera rápida y organizada."
+];
+
+// Arreglo de rutas estáticas para JS
+const imagenes = [
+    "/static/img/uni1.jpg",
+    "/static/img/uni2.jpg",
+    "/static/img/uni3.jpg"
+];
+
+let i = 0;
+setInterval(() => {
+    i = (i + 1) % mensajes.length;
+    document.getElementById("mensaje1").innerText = mensajes[i];
+    document.getElementById("mensaje2").innerText = mensajes[(i+1) % mensajes.length];
+    document.getElementById("imagen").src = imagenes[i % imagenes.length];
+}, 8000);
+</script>
+
+</body>
+</html>
