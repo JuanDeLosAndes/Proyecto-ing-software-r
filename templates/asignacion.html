@@ -1,26 +1,35 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Asignación de Salones</title>
+    <meta charset="UTF-8">
+    <title>Sistema de Asignación Universitaria</title>
     <style>
-        body { margin: 0; font-family: Arial; }
+        body { margin: 0; font-family: Arial, sans-serif; background: #f2f2f2; }
         .container { display: flex; height: 100vh; }
-        .left { width: 30%; background: #0d1b4c; display: flex; flex-direction: column; }
-        .top-box { height: 50%; color: white; padding: 25px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; text-align: justify; font-size: 14px; box-sizing: border-box; }
+        .left { width: 25%; background: #0d1b4c; display: flex; flex-direction: column; }
+        .top-box { height: 50%; color: white; padding: 25px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; text-align: justify; font-size: 14px; box-sizing: border-box; overflow-y: auto; }
         .linea { height: 2px; background: yellow; }
-        .bottom-box { height: 50%; position: relative; padding: 25px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; color: white; text-align: justify; font-size: 14px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .bottom-box img { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0.3; z-index: 1; }
-        .bottom-box p { position: relative; z-index: 2; }
-        .right { width: 70%; background: #f2f2f2; padding: 20px; text-align: center; }
-        h1 { margin-bottom: 20px; }
-        table { margin: auto; border-collapse: collapse; }
-        td, th { border: 1px solid #ccc; padding: 20px; position: relative; cursor: pointer; }
-        th { background: #3b6ea5; color: white; }
-        .materia { background: #4f79a6; color: white; border-radius: 5px; padding: 5px; }
-        .tooltip { visibility: hidden; background: #1c2f4a; color: white; text-align: left; padding: 10px; border-radius: 5px; position: absolute; top: 100%; left: 0; width: 200px; z-index: 1; }
-        td:hover .tooltip { visibility: visible; }
-        button { margin-top: 20px; padding: 10px 20px; background: #3b6ea5; color: white; border: none; cursor: pointer; }
+        .bottom-box { height: 50%; position: relative; padding: 25px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; color: white; text-align: justify; font-size: 14px; overflow: hidden; display: flex; align-items: center;}
+        .bottom-box img { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0.3; z-index: 1; top:0; left:0; }
+        .bottom-box p { position: relative; z-index: 2; margin: 0; }
+        .right { width: 75%; background: #f2f2f2; padding: 20px; overflow-y: auto; box-sizing: border-box; }
+        h1 { color: #0d1b4c; text-align: center; margin: 0 0 20px 0; font-size: 24px; }
+        h3 { margin-top: 0; color: #0d1b4c; border-bottom: 2px solid #3b6ea5; padding-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        td, th { border: 1px solid #ccc; padding: 10px; text-align: center; height: 60px; position: relative; }
+        th { background: #3b6ea5; color: white; font-weight: bold; }
+        .materia { background: #4f79a6; color: white; border-radius: 5px; padding: 8px; font-size: 12px; font-weight: bold; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; }
+        .materia span { font-size: 10px; color: #ffeb3b; margin-top: 4px; }
+        .vacio { background: #e5e5e5; min-height: 40px; border-radius: 3px; }
+        button { padding: 10px 20px; background: #3b6ea5; color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; transition: background 0.2s; }
         button:hover { background: #2c4e75; }
+        .oculto { display: none !important; }
+        .panel-flex { display: flex; gap: 20px; align-items: flex-start; }
+        .tabla-wrapper { flex: 2; overflow-x: auto; }
+        .box-derecha { flex: 1; background: white; padding: 20px; border-radius: 10px; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        label { display: block; font-size: 13px; font-weight: bold; color: #333; margin-bottom: 5px; text-align: left; }
+        textarea, input, select { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-family: Arial, sans-serif; }
+        textarea { resize: vertical; }
     </style>
 </head>
 <body>
@@ -28,78 +37,223 @@
 <div class="container">
     <div class="left">
         <div class="top-box">
-            <h3>¿Cómo funciona?</h3>
-            <p>Este sistema permite visualizar la asignación de salones de manera organizada según horarios y días de la semana.</p>
-            <p>Cada bloque representa una materia. Al pasar el cursor sobre ella, se muestra información detallada como semestre, salón, horario y créditos.</p>
-            <p>Esto permite optimizar el uso de espacios y evitar conflictos académicos.</p>
+            <h3>Información</h3>
+            <p id="txt_superior">Sincronizando información institucional con la base de datos...</p>
         </div>
         <div class="linea"></div>
         <div class="bottom-box">
-            <img id="imagen" src="{{ url_for('static', path='img/uni1.png') }}">
-            <p id="mensaje">
-                La Universidad Católica de Colombia cuenta con acreditación de alta calidad,
-                garantizando excelencia académica. La facultad de ingeniería ha optimizado
-                su plan de estudios, pasando de 10 a 8 semestres para mejorar la formación profesional.
-            </p>
+            <img id="img_lateral" src="">
+            <p id="txt_inferior">Cargando lineamientos institucionales de alta calidad...</p>
         </div>
     </div>
 
     <div class="right">
-        <h1>Asignación de Salones</h1>
-        <table>
-            <tr>
-                <th>Hora</th><th>Lunes</th><th>Martes</th><th>Miércoles</th><th>Jueves</th><th>Viernes</th>
-            </tr>
-            <tr>
-                <td>7:00</td>
-                <td>
-                    <div class="materia">Matemáticas</div>
-                    <div class="tooltip">Semestre: 1<br>Salón: 101<br>Horario: 7:00 - 9:00<br>Créditos: 3</div>
-                </td>
-                <td></td>
-                <td>
-                    <div class="materia">Física</div>
-                    <div class="tooltip">Semestre: 2<br>Salón: 202<br>Horario: 7:00 - 9:00<br>Créditos: 4</div>
-                </td>
-                <td></td><td></td>
-            </tr>
-            <tr>
-                <td>9:00</td>
-                <td></td>
-                <td>
-                    <div class="materia">Programación</div>
-                    <div class="tooltip">Semestre: 3<br>Salón: 303<br>Horario: 9:00 - 11:00<br>Créditos: 4</div>
-                </td>
-                <td></td>
-                <td>
-                    <div class="materia">Bases de Datos</div>
-                    <div class="tooltip">Semestre: 4<br>Salón: 404<br>Horario: 9:00 - 11:00<br>Créditos: 3</div>
-                </td>
-                <td></td>
-            </tr>
-        </table>
-        <button onclick="logout()">Cerrar sesión</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 10px; border: 1px solid #ccc;">
+            <h1 id="txt_rol" style="margin: 0; font-size: 20px;">Cargando Sesión...</h1>
+            <button onclick="ejecutarLogout()" style="background: #dc3545;">Cerrar Sesión</button>
+        </div>
+
+        <div id="vista_admin" class="oculto box-derecha" style="max-width: 600px; margin: 20px auto;">
+            <h3>⚙️ Panel de Gestión de Interfaz Institucional</h3>
+            
+            <label>Mensaje Panel Superior:</label>
+            <textarea id="inp_sup" rows="3" placeholder="Escriba el mensaje para el cuadro superior lateral..."></textarea>
+            
+            <label>Mensaje Panel Inferior:</label>
+            <textarea id="inp_inf" rows="3" placeholder="Escriba el mensaje para el cuadro inferior lateral..."></textarea>
+            
+            <label>URL Imagen del Login / Lateral:</label>
+            <input type="text" id="inp_img" placeholder="https://ejemplo.com/universidad.jpg">
+            
+            <button onclick="guardarConfiguracionAdmin()" style="background:#28a745; width:100%; font-size: 15px; margin-bottom: 10px;">
+                💾 Guardar Cambios para Todos los Usuarios
+            </button>
+            
+            <button onclick="ejecutarAlgoritmoGenetico()" style="background:#ff9800; width:100%; font-size: 15px; margin-top: 5px;">
+                🧬 Auto-Asignar Salones Óptimos (Algoritmo Genético)
+            </button>
+        </div>
+
+        <div id="vista_horario" class="oculto panel-flex">
+            <div class="tabla-wrapper">
+                <table id="tabla_clases">
+                    </table>
+            </div>
+
+            <div id="cuadro_profesor" class="oculto box-derecha">
+                <h3>🔄 Solicitar Cambio de Salón</h3>
+                
+                <label>Mis Materias Vigentes a Cargo:</label>
+                <select id="sel_grupo_prof">
+                    </select>
+                
+                <label>Seleccionar Nuevo Salón Fijo:</label>
+                <select id="sel_salon_prof">
+                    <optgroup label="Salas de Cómputo (Exclusivo Sistemas)">
+                        <option value="1">Sala de Cómputo 1 (Cap: 20)</option>
+                        <option value="2">Sala de Cómputo 2 (Cap: 20)</option>
+                        <option value="3">Sala de Cómputo 3 (Cap: 20)</option>
+                        <option value="4">Sala de Cómputo 4 (Cap: 20)</option>
+                        <option value="5">Sala de Cómputo 5 (Cap: 20)</option>
+                        <option value="6">Sala de Cómputo 6 (Cap: 20)</option>
+                        <option value="7">Sala de Cómputo 7 (Cap: 30)</option>
+                    </optgroup>
+                    <optgroup label="Aulas Teóricas (Exclusivo Ciencias Básicas)">
+                        <option value="8">AULA-301 (Cap: 25)</option>
+                        <option value="9">AULA-302 (Cap: 30)</option>
+                        <option value="10">AULA-303 (Cap: 35)</option>
+                        <option value="11">AULA-304 (Cap: 28)</option>
+                        <option value="12">AULA-305 (Cap: 32)</option>
+                        <option value="13">AULA-306 (Cap: 26)</option>
+                        <option value="14">AULA-307 (Cap: 34)</option>
+                        <option value="15">AULA-308 (Cap: 30)</option>
+                    </optgroup>
+                </select>
+                
+                <button onclick="solicitarCambioSalon()" style="width: 100%; font-size: 14px;">
+                    ⚡ Validar e Insertar Salón
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
-const imagenes = [
-    "/static/img/uni1.png",
-    "/static/img/uni2.png",
-    "/static/img/uni3.png"
-];
+    const API = "http://127.0.0.1:8000";
+    const rol = localStorage.getItem("userRole");
+    const codigo = localStorage.getItem("userName");
 
-let i = 0;
-setInterval(() => {
-    i = (i + 1) % imagenes.length;
-    document.getElementById("imagen").src = imagenes[i];
-}, 8000);
+    document.addEventListener("DOMContentLoaded", () => {
+        // Control estricto de sesión en frontend
+        if (!codigo || !rol) { window.location.href = "/login"; return; }
+        
+        // 1. Cargar la configuración visual compartida en tiempo real desde la Base de Datos
+        fetch(`${API}/front/config`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("txt_superior").innerText = data.mensaje_superior;
+            document.getElementById("txt_inferior").innerText = data.mensaje_inferior;
+            document.getElementById("img_lateral").src = data.url_imagen;
+            
+            // Si el rol es administrador, pre-llenar los formularios con el estado actual de la DB
+            if (rol === "Administrador") {
+                document.getElementById("inp_sup").value = data.mensaje_superior;
+                document.getElementById("inp_inf").value = data.mensaje_inferior;
+                document.getElementById("inp_img").value = data.url_imagen;
+            }
+        }).catch(err => console.warn("Modo contingencia local activado."));
 
-function logout(){
+        document.getElementById("txt_rol").innerText = `Panel Institucional: ${rol} — Código: ${codigo}`;
 
-    window.location.href = "/login";
-}
+        // 2. Bifurcación de renderizado basado en roles (RBAC)
+        if (rol === "Administrador") {
+            document.getElementById("vista_admin").classList.remove("oculto");
+        } else {
+            document.getElementById("vista_horario").classList.remove("oculto");
+            if (rol === "Profesor") {
+                document.getElementById("cuadro_profesor").classList.remove("oculto");
+            }
+            renderizarHorarioDB();
+        }
+    });
+
+    // 3. Renderizar Horario Real controlando Huecos Intermedios de 7:00 a 22:00
+    function renderizarHorarioDB() {
+        fetch(`${API}/horarios/${codigo}`)
+        .then(res => res.json())
+        .then(horarioData => {
+            const tabla = document.getElementById("tabla_clases");
+            const dias = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes"];
+            const selectProf = document.getElementById("sel_grupo_prof");
+            
+            let html = `<tr><th>Hora</th>${dias.map(d => `<th>${d}</th>`).join('')}</tr>`;
+            if (selectProf) selectProf.innerHTML = "";
+
+            let gruposAgregados = [];
+
+            // Iteración explícita sobre bloques de tiempo institucionales
+            for (let h = 7; h <= 22; h++) {
+                let bloque = `${h}:00`;
+                html += `<tr><td style="font-weight:bold; background:#f8f9fa;">${bloque}</td>`;
+                
+                dias.forEach(d => {
+                    let celda = (horarioData[bloque] && horarioData[bloque][d]) ? horarioData[bloque][d] : null;
+                    if (celda) {
+                        html += `<td>
+                                    <div class="materia">
+                                        ${celda.materia}
+                                        <span>📍 ${celda.salon}</span>
+                                    </div>
+                                 </td>`;
+                        
+                        // Si el rol es profesor, inyectar dinámicamente solo sus materias reales asignadas
+                        if (rol === "Profesor" && celda.id_grupo && !gruposAgregados.includes(celda.id_grupo)) {
+                            gruposAgregados.push(celda.id_grupo);
+                            selectProf.innerHTML += `<option value="${celda.id_grupo}">${celda.materia} (Ref: G-${celda.id_grupo})</option>`;
+                        }
+                    } else {
+                        // Hueco intermedio detectado: Deja la celda vacía con diseño limpio
+                        html += `<td><div class="vacio"></div></td>`;
+                    }
+                });
+                html += `</tr>`;
+            }
+            tabla.innerHTML = html;
+        });
+    }
+
+    // 4. Lógica de Persistencia Global (Afecta a todos los clientes concurrentes)
+    function guardarConfiguracionAdmin() {
+        const sup = document.getElementById("inp_sup").value;
+        const inf = document.getElementById("inp_inf").value;
+        const img = document.getElementById("inp_img").value;
+
+        fetch(`${API}/front/config?mensaje_sup=${encodeURIComponent(sup)}&mensaje_inf=${encodeURIComponent(inf)}&url_img=${encodeURIComponent(img)}&codigo_admin=${codigo}`, { 
+            method: "POST" 
+        })
+        .then(res => {
+            if (!res.ok) throw new Error();
+            return res.json();
+        })
+        .then(() => {
+            alert("Base de datos de interfaz actualizada globalmente con éxito.");
+            location.reload();
+        }).catch(() => alert("Error de privilegios al actualizar la interfaz institucional."));
+    }
+
+    // 5. Disparador del Algoritmo Genético de Optimización de Espacios
+    function ejecutarAlgoritmoGenetico() {
+        fetch(`${API}/admin/optimizar-horarios?codigo_admin=${codigo}`, { method: "POST" })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.mensaje || data.detail);
+            location.reload();
+        }).catch(() => alert("Error de ejecución en el servicio de algoritmos genéticos."));
+    }
+
+    // 6. Solicitud de cambio de salón controlado por el Profesor
+    function solicitarCambioSalon() {
+        const idGrupo = document.getElementById("sel_grupo_prof").value;
+        const idSalon = document.getElementById("sel_salon_prof").value;
+        if (!idGrupo) { alert("Usted no posee materias a cargo en este periodo académico."); return; }
+
+        fetch(`${API}/profesor/cambiar-salon?codigo_profesor=${codigo}&id_grupo=${idGrupo}&id_nuevo_salon=${idSalon}`, { 
+            method: "PUT" 
+        })
+        .then(async res => {
+            let data = await res.json();
+            if (!res.ok) alert("❌ " + data.detail);
+            else {
+                alert("✅ " + data.mensaje);
+                renderizarHorarioDB();
+            }
+        });
+    }
+
+    function ejecutarLogout() { 
+        localStorage.clear(); 
+        window.location.href = "/login"; 
+    }
 </script>
-
 </body>
 </html>
