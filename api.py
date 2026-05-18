@@ -3,7 +3,16 @@ from sqlmodel import Session, select, func
 from typing import List, Optional, Dict, Any
 from database import get_session
 from models import Usuario, Rol, Estudiante, Profesor, Materia, Salon, Grupo, Inscripcion, ConfiguracionFront
-from algoritmo_genetico import ejecutar_algoritmo_universitario
+
+# Importamos los patrones arquitectónicos e interfaces desde nuestro nuevo archivo
+from services import (
+    CreadorUsuario, 
+    GestorEventosUniversidad, 
+    IAOptimizationTriggerObserver, 
+    EmailNotificationObserver,
+    ContextoInscripcion, 
+    EstrategiaGrupoMasVacio
+)
 
 router = APIRouter()
 
@@ -45,6 +54,21 @@ def login(codigo: str, contrasena: str, session: Session = Depends(get_session))
     return {"codigo": user.codigo, "rol": rol.nombre_rol if rol else "Sin Rol"}
 
 
+# --- PATRÓN 1 (CREACIONAL): REGISTRO DE USUARIOS VÍA FACTORY METHOD ---
+
+@router.post("/usuarios/registrar")
+def registrar_usuario(rol_nombre: str, codigo: str, contrasena: str, nombre: str, especialidad: Optional[str] = None, session: Session = Depends(get_session)):
+    try:
+        credenciales = {"codigo": codigo, "contrasena": contrasena}
+        perfil_datos = {"nombre": nombre, "especialidad": especialidad}
+        
+        # Invocamos la fábrica desacoplada
+        nuevo_user = CreadorUsuario.registrar_nuevo_usuario(session, rol_nombre, credenciales, perfil_datos)
+        return {"mensaje": f"Usuario con Rol [{rol_nombre}] e historial creado mediante Factory Method con ID: {nuevo_user.id}"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # --- HORARIOS DINÁMICOS POR ROL ---
 
 @router.get("/horarios/{codigo}", response_model=Dict[str, Any])
@@ -84,7 +108,7 @@ def obtener_horario_real(codigo: str, session: Session = Depends(get_session)):
     return horario_formateado
 
 
-# --- REGLA DE NEGOCIO: INSCRIPCIÓN, PROFESORES Y BALANCEO DE GRUPOS ---
+# --- PATRÓN 5 (COMPORTAMIENTO): REGLA DE INSCRIPCIÓN E INYECCIÓN DE STRATEGY ---
 
 @router.post("/inscribir")
 def inscribir_estudiante(codigo_usuario: str, id_materia: int, session: Session = Depends(get_session)):
@@ -94,22 +118,17 @@ def inscribir_estudiante(codigo_usuario: str, id_materia: int, session: Session 
         
     estudiante = session.exec(select(Estudiante).where(Estudiante.id_usuario == user.id)).first()
     materia = session.get(Materia, id_materia)
-    
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
 
-    # Mapeamos la facultad de la materia con la especialidad requerida del docente
     especialidad_requerida = "Ingeniería de Sistemas" if materia.facultad == "Sistemas" else "Ciencias Básicas"
-    
-    # Buscamos un profesor disponible que cumpla con la especialidad
     profesor_asignado = session.exec(select(Profesor).where(Profesor.especialidad == especialidad_requerida)).first()
     
     if not profesor_asignado:
-        raise HTTPException(status_code=400, detail=f"No se puede abrir el grupo: No hay profesores disponibles con la especialidad de {especialidad_requerida}.")
+        raise HTTPException(status_code=400, detail=f"Falta docente con especialidad {especialidad_requerida}")
 
     grupos = session.exec(select(Grupo).where(Grupo.id_materia == id_materia)).all()
     
-    # Si no hay grupos, creamos el primero asignando el salón correcto y el profesor
     if not grupos:
         salon = session.exec(select(Salon).where(Salon.nombre.like("Sala de Cómputo%" if materia.facultad == "Sistemas" else "AULA-%"))).first()
         grupo_elegido = Grupo(num_grupo=1, cupo_maximo=35, id_materia=id_materia, id_salon=salon.id, id_profesor=profesor_asignado.id, dia="Lunes", hora="7:00")
@@ -118,19 +137,23 @@ def inscribir_estudiante(codigo_usuario: str, id_materia: int, session: Session 
         session.refresh(grupo_elegido)
         inscritos = 0
     else:
-        grupo_elegido = min(list(grupos), key=lambda g: session.exec(select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == g.id)).one())
+        # =====================================================================
+        # ENRUTAMIENTO MEDIANTE PATRÓN STRATEGY
+        # =====================================================================
+        # Instanciamos el contexto cargando la estrategia de menor carga por defecto
+        contexto = ContextoInscripcion(EstrategiaGrupoMasVacio())
+        grupo_elegido = contexto.seleccionar(list(grupos), session)
+        # =====================================================================
         inscritos = session.exec(select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == grupo_elegido.id)).one()
     
-    # Si se supera el límite de 35, se divide el grupo
+    # Control de división automática por aforo de 35
     if inscritos + 1 > 35:
         salon = session.exec(select(Salon).where(Salon.nombre.like("Sala de Cómputo%" if materia.facultad == "Sistemas" else "AULA-%"))).first()
-        
         nuevo_grupo = Grupo(num_grupo=len(grupos)+1, cupo_maximo=35, id_materia=id_materia, id_salon=salon.id, id_profesor=profesor_asignado.id, dia="Viernes", hora="11:00")
         session.add(nuevo_grupo)
         session.commit()
         session.refresh(nuevo_grupo)
         
-        # Balanceo: Mover 5 alumnos al nuevo grupo
         alumnos_mover = session.exec(select(Inscripcion).where(Inscripcion.id_grupo == grupo_elegido.id).limit(5)).all()
         for a in list(alumnos_mover):
             a.id_grupo = nuevo_grupo.id
@@ -143,12 +166,10 @@ def inscribir_estudiante(codigo_usuario: str, id_materia: int, session: Session 
     session.add(insc)
     session.commit()
     
-    return {
-        "mensaje": f"Inscripción exitosa. El sistema ha asignado automáticamente al Prof. {profesor_asignado.nombre} (Especialidad: {profesor_asignado.especialidad})."
-    }
+    return {"mensaje": "Matrícula procesada dinámicamente con éxito."}
 
 
-# --- GESTIÓN DE PROFESORES ---
+# --- PATRÓN 4 (COMPORTAMIENTO): TRIGGER BASADO EN EL PATRÓN OBSERVER ---
 
 @router.put("/profesor/cambiar-salon")
 def profesor_cambiar_salon(codigo_profesor: str, id_grupo: int, id_nuevo_salon: int, session: Session = Depends(get_session)):
@@ -162,7 +183,6 @@ def profesor_cambiar_salon(codigo_profesor: str, id_grupo: int, id_nuevo_salon: 
     materia = session.get(Materia, grupo.id_materia)
     nuevo_salon = session.get(Salon, id_nuevo_salon)
     
-    # Validaciones físicas estrictas
     if materia.facultad == "Sistemas" and "Sala" not in nuevo_salon.nombre:
         raise HTTPException(status_code=400, detail="Incompatibilidad técnica: Sistemas exige Sala de Cómputo.")
     if materia.facultad == "Ciencias Básicas" and "AULA" not in nuevo_salon.nombre:
@@ -170,25 +190,25 @@ def profesor_cambiar_salon(codigo_profesor: str, id_grupo: int, id_nuevo_salon: 
         
     inscritos = session.exec(select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == id_grupo)).one()
     if inscritos > nuevo_salon.capacidad:
-        raise HTTPException(status_code=400, detail=f"Aforo excedido: El salón aloja {nuevo_salon.capacidad} estudiantes y el grupo tiene {inscritos}.")
+        raise HTTPException(status_code=400, detail=f"Aforo excedido: Capacidad de {nuevo_salon.capacidad} para {inscritos} alumnos.")
         
+    # Realizamos la persistencia del cambio manual del docente
     grupo.id_salon = nuevo_salon.id
     session.add(grupo)
     session.commit()
-    return {"mensaje": "Salón actualizado y validado correctamente"}
 
+    # =====================================================================
+    # ARQUITECTURA BASADA EN EVENTOS: OBSERVADORES EN CADENA
+    # =====================================================================
+    # Instanciamos el sujeto publicador
+    publicador = GestorEventosUniversidad()
+    
+    # Suscribimos los observadores encargados de reaccionar de forma independiente
+    publicador.suscribir(IAOptimizationTriggerObserver()) # Gatilla Decorator + IA
+    publicador.suscribir(EmailNotificationObserver())       # Gatilla Adapter + Email
+    
+    # Emitimos el evento principal. Esto ejecutará las tareas secundarias de golpe
+    publicador.notificar_todos("CAMBIO_SALON", {"grupo_id": id_grupo, "session": session})
+    # =====================================================================
 
-# --- ALGORITMO GENÉTICO (ADMINISTRADOR) ---
-
-@router.post("/admin/optimizar-horarios")
-def optimizar_infraestructura_global(codigo_admin: str, session: Session = Depends(get_session)):
-    """Ruta exclusiva que permite al Admin recalcular y balancear toda la universidad."""
-    user = session.exec(select(Usuario).where(Usuario.codigo == codigo_admin)).first()
-    if not user or session.get(Rol, user.id_rol).nombre_rol != "Administrador":
-        raise HTTPException(status_code=403, detail="Permiso denegado. Operación de alta jerarquía.")
-        
-    resultado = ejecutar_algoritmo_universitario(session)
-    if "error" in resultado:
-        raise HTTPException(status_code=400, detail=resultado["error"])
-        
-    return resultado
+    return {"mensaje": "Salón reasignado. El evento disparó la IA (Decorada) y Notificaciones (Adaptadas) automáticamente."}

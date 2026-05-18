@@ -68,16 +68,12 @@
             <button onclick="guardarConfiguracionAdmin()" style="background:#28a745; width:100%; font-size: 15px; margin-bottom: 10px;">
                 💾 Guardar Cambios para Todos los Usuarios
             </button>
-            
-            <button onclick="ejecutarAlgoritmoGenetico()" style="background:#ff9800; width:100%; font-size: 15px; margin-top: 5px;">
-                🧬 Auto-Asignar Salones Óptimos (Algoritmo Genético)
-            </button>
         </div>
 
         <div id="vista_horario" class="oculto panel-flex">
             <div class="tabla-wrapper">
                 <table id="tabla_clases">
-                    </table>
+                </table>
             </div>
 
             <div id="cuadro_profesor" class="oculto box-derecha">
@@ -85,7 +81,7 @@
                 
                 <label>Mis Materias Vigentes a Cargo:</label>
                 <select id="sel_grupo_prof">
-                    </select>
+                </select>
                 
                 <label>Seleccionar Nuevo Salón Fijo:</label>
                 <select id="sel_salon_prof">
@@ -124,10 +120,8 @@
     const codigo = localStorage.getItem("userName");
 
     document.addEventListener("DOMContentLoaded", () => {
-        // Control estricto de sesión en frontend
         if (!codigo || !rol) { window.location.href = "/login"; return; }
         
-        // 1. Cargar la configuración visual compartida en tiempo real desde la Base de Datos
         fetch(`${API}/front/config`)
         .then(res => res.json())
         .then(data => {
@@ -135,7 +129,6 @@
             document.getElementById("txt_inferior").innerText = data.mensaje_inferior;
             document.getElementById("img_lateral").src = data.url_imagen;
             
-            // Si el rol es administrador, pre-llenar los formularios con el estado actual de la DB
             if (rol === "Administrador") {
                 document.getElementById("inp_sup").value = data.mensaje_superior;
                 document.getElementById("inp_inf").value = data.mensaje_inferior;
@@ -145,7 +138,6 @@
 
         document.getElementById("txt_rol").innerText = `Panel Institucional: ${rol} — Código: ${codigo}`;
 
-        // 2. Bifurcación de renderizado basado en roles (RBAC)
         if (rol === "Administrador") {
             document.getElementById("vista_admin").classList.remove("oculto");
         } else {
@@ -157,7 +149,6 @@
         }
     });
 
-    // 3. Renderizar Horario Real controlando Huecos Intermedios de 7:00 a 22:00
     function renderizarHorarioDB() {
         fetch(`${API}/horarios/${codigo}`)
         .then(res => res.json())
@@ -171,7 +162,6 @@
 
             let gruposAgregados = [];
 
-            // Iteración explícita sobre bloques de tiempo institucionales
             for (let h = 7; h <= 22; h++) {
                 let bloque = `${h}:00`;
                 html += `<tr><td style="font-weight:bold; background:#f8f9fa;">${bloque}</td>`;
@@ -186,13 +176,11 @@
                                     </div>
                                  </td>`;
                         
-                        // Si el rol es profesor, inyectar dinámicamente solo sus materias reales asignadas
                         if (rol === "Profesor" && celda.id_grupo && !gruposAgregados.includes(celda.id_grupo)) {
                             gruposAgregados.push(celda.id_grupo);
                             selectProf.innerHTML += `<option value="${celda.id_grupo}">${celda.materia} (Ref: G-${celda.id_grupo})</option>`;
                         }
                     } else {
-                        // Hueco intermedio detectado: Deja la celda vacía con diseño limpio
                         html += `<td><div class="vacio"></div></td>`;
                     }
                 });
@@ -202,7 +190,6 @@
         });
     }
 
-    // 4. Lógica de Persistencia Global (Afecta a todos los clientes concurrentes)
     function guardarConfiguracionAdmin() {
         const sup = document.getElementById("inp_sup").value;
         const inf = document.getElementById("inp_inf").value;
@@ -221,17 +208,7 @@
         }).catch(() => alert("Error de privilegios al actualizar la interfaz institucional."));
     }
 
-    // 5. Disparador del Algoritmo Genético de Optimización de Espacios
-    function ejecutarAlgoritmoGenetico() {
-        fetch(`${API}/admin/optimizar-horarios?codigo_admin=${codigo}`, { method: "POST" })
-        .then(res => res.json())
-        .then(data => {
-            alert(data.mensaje || data.detail);
-            location.reload();
-        }).catch(() => alert("Error de ejecución en el servicio de algoritmos genéticos."));
-    }
-
-    // 6. Solicitud de cambio de salón controlado por el Profesor
+    // Al solicitar el cambio, se disparará internamente el Algoritmo Genético
     function solicitarCambioSalon() {
         const idGrupo = document.getElementById("sel_grupo_prof").value;
         const idSalon = document.getElementById("sel_salon_prof").value;
