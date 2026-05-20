@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 from database import get_session
 from models import Usuario, Rol, Estudiante, Profesor, Materia, Salon, Grupo, Inscripcion, ConfiguracionFront
 
-# Importamos los patrones arquitectónicos e interfaces desde nuestro nuevo archivo
+# Importaciones de nuestra capa de arquitectura de software desacoplada (services.py)
 from services import (
     CreadorUsuario, 
     GestorEventosUniversidad, 
@@ -49,12 +49,12 @@ def guardar_configuracion_global(mensaje_sup: str, mensaje_inf: str, url_img: st
 def login(codigo: str, contrasena: str, session: Session = Depends(get_session)):
     user = session.exec(select(Usuario).where(Usuario.codigo == codigo, Usuario.contrasena == contrasena)).first()
     if not user:
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas institucionalmente")
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
     rol = session.get(Rol, user.id_rol)
     return {"codigo": user.codigo, "rol": rol.nombre_rol if rol else "Sin Rol"}
 
 
-# --- PATRÓN 1 (CREACIONAL): REGISTRO DE USUARIOS VÍA FACTORY METHOD ---
+# --- PATRÓN 1 (CREACIONAL): REGISTRO DE USUARIOS POR FACTORY METHOD ---
 
 @router.post("/usuarios/registrar")
 def registrar_usuario(rol_nombre: str, codigo: str, contrasena: str, nombre: str, especialidad: Optional[str] = None, session: Session = Depends(get_session)):
@@ -62,9 +62,9 @@ def registrar_usuario(rol_nombre: str, codigo: str, contrasena: str, nombre: str
         credenciales = {"codigo": codigo, "contrasena": contrasena}
         perfil_datos = {"nombre": nombre, "especialidad": especialidad}
         
-        # Invocamos la fábrica desacoplada
+        # Consumimos la fábrica polimórfica encapsulada en servicios
         nuevo_user = CreadorUsuario.registrar_nuevo_usuario(session, rol_nombre, credenciales, perfil_datos)
-        return {"mensaje": f"Usuario con Rol [{rol_nombre}] e historial creado mediante Factory Method con ID: {nuevo_user.id}"}
+        return {"mensaje": f"Perfil [{rol_nombre}] creado exitosamente vía Factory Method con ID: {nuevo_user.id}"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -108,7 +108,7 @@ def obtener_horario_real(codigo: str, session: Session = Depends(get_session)):
     return horario_formateado
 
 
-# --- PATRÓN 5 (COMPORTAMIENTO): REGLA DE INSCRIPCIÓN E INYECCIÓN DE STRATEGY ---
+# --- PATRÓN 5 (COMPORTAMIENTO): MATRÍCULA BALANCEADA POR PATRÓN STRATEGY ---
 
 @router.post("/inscribir")
 def inscribir_estudiante(codigo_usuario: str, id_materia: int, session: Session = Depends(get_session)):
@@ -121,11 +121,18 @@ def inscribir_estudiante(codigo_usuario: str, id_materia: int, session: Session 
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada")
 
+    # 1. Identificamos qué tipo de profesor necesita la materia
     especialidad_requerida = "Ingeniería de Sistemas" if materia.facultad == "Sistemas" else "Ciencias Básicas"
+    
+    # 2. Buscamos si existe ALGÚN profesor disponible con esa especialidad
     profesor_asignado = session.exec(select(Profesor).where(Profesor.especialidad == especialidad_requerida)).first()
     
+    # 3. NUEVA VALIDACIÓN: Si no hay profesor, detenemos todo y mandamos el mensaje
     if not profesor_asignado:
-        raise HTTPException(status_code=400, detail=f"Falta docente con especialidad {especialidad_requerida}")
+        return {
+            "alerta": True,
+            "mensaje": f"Lo sentimos, en este momento no hay profesores disponibles con la especialidad de '{especialidad_requerida}' para abrir la materia de {materia.nombre}."
+        }
 
     grupos = session.exec(select(Grupo).where(Grupo.id_materia == id_materia)).all()
     
@@ -138,15 +145,13 @@ def inscribir_estudiante(codigo_usuario: str, id_materia: int, session: Session 
         inscritos = 0
     else:
         # =====================================================================
-        # ENRUTAMIENTO MEDIANTE PATRÓN STRATEGY
+        # ASIGNACIÓN DE GRUPOS MEDIANTE EL PATRÓN STRATEGY
         # =====================================================================
-        # Instanciamos el contexto cargando la estrategia de menor carga por defecto
-        contexto = ContextoInscripcion(EstrategiaGrupoMasVacio())
-        grupo_elegido = contexto.seleccionar(list(grupos), session)
-        # =====================================================================
+        contexto_balanceo = ContextoInscripcion(EstrategiaGrupoMasVacio())
+        grupo_elegido = contexto_balanceo.seleccionar(list(grupos), session)
         inscritos = session.exec(select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == grupo_elegido.id)).one()
     
-    # Control de división automática por aforo de 35
+    # Algoritmo de división automática por aforo límite de 35 alumnos
     if inscritos + 1 > 35:
         salon = session.exec(select(Salon).where(Salon.nombre.like("Sala de Cómputo%" if materia.facultad == "Sistemas" else "AULA-%"))).first()
         nuevo_grupo = Grupo(num_grupo=len(grupos)+1, cupo_maximo=35, id_materia=id_materia, id_salon=salon.id, id_profesor=profesor_asignado.id, dia="Viernes", hora="11:00")
@@ -166,10 +171,10 @@ def inscribir_estudiante(codigo_usuario: str, id_materia: int, session: Session 
     session.add(insc)
     session.commit()
     
-    return {"mensaje": "Matrícula procesada dinámicamente con éxito."}
+    return {"alerta": False, "mensaje": f"Matrícula procesada. Profesor asignado: {profesor_asignado.nombre}."}
 
 
-# --- PATRÓN 4 (COMPORTAMIENTO): TRIGGER BASADO EN EL PATRÓN OBSERVER ---
+# --- PATRÓN 4 (DE COMPORTAMIENTO): ORQUESTACIÓN MEDIANTE EL PATRÓN OBSERVER ---
 
 @router.put("/profesor/cambiar-salon")
 def profesor_cambiar_salon(codigo_profesor: str, id_grupo: int, id_nuevo_salon: int, session: Session = Depends(get_session)):
@@ -190,24 +195,19 @@ def profesor_cambiar_salon(codigo_profesor: str, id_grupo: int, id_nuevo_salon: 
         
     inscritos = session.exec(select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == id_grupo)).one()
     if inscritos > nuevo_salon.capacidad:
-        raise HTTPException(status_code=400, detail=f"Aforo excedido: Capacidad de {nuevo_salon.capacidad} para {inscritos} alumnos.")
+        raise HTTPException(status_code=400, detail=f"Aforo excedido: El salón aloja {nuevo_salon.capacidad} estudiantes y el grupo tiene {inscritos}.")
         
-    # Realizamos la persistencia del cambio manual del docente
+    # Guardamos de forma inmediata la actualización manual solicitada por el docente
     grupo.id_salon = nuevo_salon.id
     session.add(grupo)
     session.commit()
 
     # =====================================================================
-    # ARQUITECTURA BASADA EN EVENTOS: OBSERVADORES EN CADENA
+    # ARQUITECTURA BASADA EN EVENTOS: EJECUCIÓN CON OBSERVER
     # =====================================================================
-    # Instanciamos el sujeto publicador
     publicador = GestorEventosUniversidad()
-    
-    # Suscribimos los observadores encargados de reaccionar de forma independiente
-    publicador.suscribir(IAOptimizationTriggerObserver()) # Gatilla Decorator + IA
-    publicador.suscribir(EmailNotificationObserver())       # Gatilla Adapter + Email
-    
-    # Emitimos el evento principal. Esto ejecutará las tareas secundarias de golpe
+    publicador.suscribir(IAOptimizationTriggerObserver()) # Gatilla IA y Logs
+    publicador.suscribir(EmailNotificationObserver())       # Gatilla Adapter de Email
     publicador.notificar_todos("CAMBIO_SALON", {"grupo_id": id_grupo, "session": session})
     # =====================================================================
 
