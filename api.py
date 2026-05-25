@@ -12,7 +12,6 @@ from services import (
 
 router = APIRouter()
 
-# Schemas de Validacion para Pydantic y Swagger
 class UsuarioRegistro(BaseModel):
     rol_nombre: str
     codigo: str
@@ -22,13 +21,18 @@ class UsuarioRegistro(BaseModel):
 
 class ConfiguracionUpdate(BaseModel):
     codigo_admin: str
-    mensaje_sup: Optional[str] = None
-    mensaje_inf: Optional[str] = None
-    url_img: Optional[str] = None
+    msg_1: Optional[str] = None
+    msg_2: Optional[str] = None
+    msg_3: Optional[str] = None
+    msg_4: Optional[str] = None
+    img_1: Optional[str] = None
+    img_2: Optional[str] = None
+    img_3: Optional[str] = None
 
 class MatricularReq(BaseModel):
     codigo_usuario: str
     id_materia: int
+    id_grupo: Optional[int] = None
 
 @router.get("/front/config", response_model=ConfiguracionFront)
 def obtener_configuracion_global(session: Session = Depends(get_session)):
@@ -44,11 +48,19 @@ def guardar_configuracion_global(data: ConfiguracionUpdate, session: Session = D
     
     config = session.exec(select(ConfiguracionFront)).first()
     if not config:
-        config = ConfiguracionFront(mensaje_superior=data.mensaje_sup or "", mensaje_inferior=data.mensaje_inf or "", url_imagen=data.url_img or "")
+        config = ConfiguracionFront(
+            mensaje_1=data.msg_1 or "", mensaje_2=data.msg_2 or "", 
+            mensaje_3=data.msg_3 or "", mensaje_4=data.msg_4 or "", 
+            url_img_1=data.img_1 or "", url_img_2=data.img_2 or "", url_img_3=data.img_3 or ""
+        )
     else:
-        if data.mensaje_sup: config.mensaje_superior = data.mensaje_sup
-        if data.mensaje_inf: config.mensaje_inferior = data.mensaje_inf
-        if data.url_img: config.url_imagen = data.url_img
+        if data.msg_1 is not None: config.mensaje_1 = data.msg_1
+        if data.msg_2 is not None: config.mensaje_2 = data.msg_2
+        if data.msg_3 is not None: config.mensaje_3 = data.msg_3
+        if data.msg_4 is not None: config.mensaje_4 = data.msg_4
+        if data.img_1 is not None: config.url_img_1 = data.img_1
+        if data.img_2 is not None: config.url_img_2 = data.img_2
+        if data.img_3 is not None: config.url_img_3 = data.img_3
         
     session.add(config)
     session.commit()
@@ -63,6 +75,20 @@ def login(codigo: str, contrasena: str, session: Session = Depends(get_session))
 
 @router.post("/usuarios/registrar")
 def registrar_usuario(data: UsuarioRegistro, session: Session = Depends(get_session)):
+    # Validaciones de Seguridad de Código Institucional
+    if not data.codigo.isdigit():
+        raise HTTPException(status_code=400, detail="El código debe contener unicamente números.")
+        
+    if data.rol_nombre == "Estudiante":
+        if len(data.codigo) != 8 or not data.codigo.startswith("6700"):
+            raise HTTPException(status_code=400, detail="El código de Estudiante debe tener 8 digitos y empezar por 6700.")
+    elif data.rol_nombre == "Administrador":
+        if len(data.codigo) != 8 or not data.codigo.startswith("9900"):
+            raise HTTPException(status_code=400, detail="El código de Administrador debe tener 8 digitos y empezar por 9900.")
+    elif data.rol_nombre == "Profesor":
+        if len(data.codigo) != 10 or data.codigo.startswith("6700") or data.codigo.startswith("9900"):
+            raise HTTPException(status_code=400, detail="El código de Profesor debe tener 10 digitos y NO puede empezar por 6700 ni 9900.")
+
     try:
         credenciales = {"codigo": data.codigo, "contrasena": data.contrasena}
         perfil_datos = {"nombre": data.nombre, "especialidad": data.especialidad}
@@ -88,8 +114,16 @@ def obtener_horario_real(codigo: str, session: Session = Depends(get_session)):
                 if grupo and grupo.hora and grupo.dia:
                     materia = session.get(Materia, grupo.id_materia)
                     salon = session.get(Salon, grupo.id_salon)
+                    profesor = session.get(Profesor, grupo.id_profesor)
+                    
                     if grupo.hora not in horario_formateado: horario_formateado[grupo.hora] = {}
-                    horario_formateado[grupo.hora][grupo.dia] = {"materia": materia.nombre, "salon": salon.nombre}
+                    
+                    horario_formateado[grupo.hora][grupo.dia] = {
+                        "materia": materia.nombre, 
+                        "salon": salon.nombre,
+                        "num_grupo": grupo.num_grupo,
+                        "info_extra": f"Profesor(a): {profesor.nombre}" if profesor else "Profesor: N/A"
+                    }
 
     elif rol == "Profesor":
         profesor = session.exec(select(Profesor).where(Profesor.id_usuario == user.id)).first()
@@ -99,10 +133,38 @@ def obtener_horario_real(codigo: str, session: Session = Depends(get_session)):
                 if g.hora and g.dia:
                     materia = session.get(Materia, g.id_materia)
                     salon = session.get(Salon, g.id_salon)
+                    inscritos_count = session.exec(select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == g.id)).one()
+                    
                     if g.hora not in horario_formateado: horario_formateado[g.hora] = {}
-                    horario_formateado[g.hora][g.dia] = {"materia": materia.nombre, "salon": salon.nombre, "id_grupo": g.id}
+                    
+                    horario_formateado[g.hora][g.dia] = {
+                        "materia": materia.nombre, 
+                        "salon": salon.nombre, 
+                        "id_grupo": g.id,
+                        "num_grupo": g.num_grupo,
+                        "info_extra": f"Estudiantes Matriculados: {inscritos_count}"
+                    }
 
     return horario_formateado
+
+@router.get("/materias/{id_materia}/grupos")
+def obtener_grupos_materia(id_materia: int, session: Session = Depends(get_session)):
+    grupos = session.exec(select(Grupo).where(Grupo.id_materia == id_materia)).all()
+    materia = session.get(Materia, id_materia)
+    limite = 30 if materia and materia.facultad == "Sistemas" else 35
+    
+    resultado = []
+    for g in grupos:
+        inscritos = session.exec(select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == g.id)).one()
+        resultado.append({
+            "id_grupo": g.id,
+            "num_grupo": g.num_grupo,
+            "dia": g.dia,
+            "hora": g.hora,
+            "inscritos": inscritos,
+            "limite": limite
+        })
+    return resultado
 
 @router.post("/inscribir")
 def inscribir_estudiante(data: MatricularReq, session: Session = Depends(get_session)):
@@ -110,13 +172,16 @@ def inscribir_estudiante(data: MatricularReq, session: Session = Depends(get_ses
     estudiante = session.exec(select(Estudiante).where(Estudiante.id_usuario == user.id)).first()
     materia = session.get(Materia, data.id_materia)
     
+    inscripcion_previa = session.exec(select(Inscripcion).where(Inscripcion.id_estudiante == estudiante.id, Inscripcion.id_materia == data.id_materia)).first()
+    if inscripcion_previa:
+        raise HTTPException(status_code=400, detail="Ya estas matriculado en esta materia.")
+
     especialidad_req = "Ingeniería de Sistemas" if materia.facultad == "Sistemas" else "Ciencias Básicas"
     profesor_asignado = session.exec(select(Profesor).where(Profesor.especialidad == especialidad_req)).first()
-    if not profesor_asignado: return {"alerta": True, "mensaje": "No hay profesores con la especialidad requerida."}
+    if not profesor_asignado: 
+        raise HTTPException(status_code=400, detail="No hay profesores con la especialidad requerida.")
 
     grupos = session.exec(select(Grupo).where(Grupo.id_materia == data.id_materia)).all()
-    
-    limite_cupo = 30 if materia.facultad == "Sistemas" else 35
     
     if not grupos:
         salon = session.exec(select(Salon).where(Salon.nombre.like("Sala de Computo%" if materia.facultad == "Sistemas" else "AULA-%"))).first()
@@ -125,51 +190,86 @@ def inscribir_estudiante(data: MatricularReq, session: Session = Depends(get_ses
         session.commit(); session.refresh(grupo_elegido)
         inscritos = 0
     else:
-        contexto = ContextoInscripcion(EstrategiaGrupoMasVacio())
-        grupo_elegido = contexto.seleccionar(list(grupos), session)
+        if data.id_grupo:
+            grupo_elegido = session.get(Grupo, data.id_grupo)
+            if not grupo_elegido or grupo_elegido.id_materia != data.id_materia:
+                raise HTTPException(status_code=400, detail="Grupo seleccionado no es valido.")
+        else:
+            contexto = ContextoInscripcion(EstrategiaGrupoMasVacio())
+            grupo_elegido = contexto.seleccionar(list(grupos), session)
+            
         inscritos = session.exec(select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == grupo_elegido.id)).one()
 
-    if inscritos + 1 > limite_cupo:
+    limite_capacidad = 30 if materia.facultad == "Sistemas" else 35
+
+    if inscritos >= limite_capacidad:
         prefix_salon = "Sala de Computo%" if materia.facultad == "Sistemas" else "AULA-%"
+        salones_ocupados = session.exec(select(Grupo.id_salon).where(Grupo.dia == grupo_elegido.dia, Grupo.hora == grupo_elegido.hora)).all()
         
-        # Consultamos que salones de la universidad estan ocupados en ese dia y hora especifica
-        salones_ocupados = session.exec(
-            select(Grupo.id_salon).where(Grupo.dia == grupo_elegido.dia, Grupo.hora == grupo_elegido.hora)
-        ).all()
-        
-        # Buscamos un nuevo salon del mismo tipo, que no sea el actual y que este desocupado en ese horario
         nuevo_salon = session.exec(
-            select(Salon)
-            .where(Salon.nombre.like(prefix_salon))
-            .where(Salon.id != grupo_elegido.id_salon)
+            select(Salon).where(Salon.nombre.like(prefix_salon))
             .where(Salon.id.not_in(salones_ocupados) if salones_ocupados else True)
         ).first()
         
-        if not nuevo_salon:
+        if not nuevo_salon and materia.facultad == "Sistemas":
             nuevo_salon = session.exec(
-                select(Salon)
-                .where(Salon.nombre.like(prefix_salon))
-                .where(Salon.id != grupo_elegido.id_salon)
+                select(Salon).where(Salon.nombre.like("AULA-%"))
+                .where(Salon.id.not_in(salones_ocupados) if salones_ocupados else True)
             ).first()
+            
+        if not nuevo_salon:
+            raise HTTPException(status_code=400, detail="No hay salones disponibles en la universidad para aperturar un nuevo grupo.")
             
         nuevo_grupo = Grupo(
             num_grupo=len(grupos) + 1,
             id_materia=data.id_materia,
-            id_salon=nuevo_salon.id if nuevo_salon else grupo_elegido.id_salon,
+            id_salon=nuevo_salon.id,
             id_profesor=profesor_asignado.id,
-            dia=grupo_elegido.dia,  # Mismo dia
-            hora=grupo_elegido.hora # Misma hora exacta
+            dia=grupo_elegido.dia,
+            hora=grupo_elegido.hora
         )
         session.add(nuevo_grupo)
         session.commit(); session.refresh(nuevo_grupo)
         
+        estudiantes_a_mover = session.exec(select(Inscripcion).where(Inscripcion.id_grupo == grupo_elegido.id).limit(4)).all()
+        for est_inscrito in estudiantes_a_mover:
+            est_inscrito.id_grupo = nuevo_grupo.id
+            session.add(est_inscrito)
+            
         insc = Inscripcion(id_estudiante=estudiante.id, id_materia=data.id_materia, id_grupo=nuevo_grupo.id, estado="Activo")
+        session.add(insc)
+        session.commit()
+        return {"alerta": False, "mensaje": f"Matricula exitosa. Se aperturó la seccion {nuevo_grupo.num_grupo} asegurando alumnos minimos."}
     else:
         insc = Inscripcion(id_estudiante=estudiante.id, id_materia=data.id_materia, id_grupo=grupo_elegido.id, estado="Activo")
-        
-    session.add(insc)
-    session.commit()
-    return {"alerta": False, "mensaje": "Matricula exitosa en seccion distribuida."}
+        session.add(insc)
+        session.commit()
+        return {"alerta": False, "mensaje": f"Matricula exitosa en el Grupo {grupo_elegido.num_grupo}."}
+
+@router.get("/profesor/salones-disponibles/{id_grupo}")
+def obtener_salones_disponibles(id_grupo: int, session: Session = Depends(get_session)):
+    grupo = session.get(Grupo, id_grupo)
+    if not grupo: raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    materia = session.get(Materia, grupo.id_materia)
+
+    salones_ocupados = session.exec(
+        select(Grupo.id_salon)
+        .where(Grupo.dia == grupo.dia, Grupo.hora == grupo.hora, Grupo.id != grupo.id)
+    ).all()
+
+    query = select(Salon)
+    if salones_ocupados:
+        query = query.where(Salon.id.not_in(salones_ocupados))
+
+    todos_salones = session.exec(query).all()
+    salones_filtrados = []
+
+    for s in todos_salones:
+        if materia.facultad == "Ciencias Básicas" and "Sala" in s.nombre:
+            continue
+        salones_filtrados.append({"id": s.id, "nombre": s.nombre, "capacidad": s.capacidad})
+
+    return salones_filtrados
 
 @router.put("/profesor/cambiar-salon")
 def profesor_cambiar_salon(codigo_profesor: str, id_grupo: int, id_nuevo_salon: int, session: Session = Depends(get_session)):
@@ -183,13 +283,11 @@ def profesor_cambiar_salon(codigo_profesor: str, id_grupo: int, id_nuevo_salon: 
     if profesor.especialidad == "Ciencias Básicas" and "Sala" in nuevo_salon.nombre:
         raise HTTPException(status_code=400, detail="Los profesores de ciencias basicas no pueden usar salas de computo.")
 
-    if materia.facultad == "Sistemas" and "Sala" not in nuevo_salon.nombre:
-        raise HTTPException(status_code=400, detail="Incompatibilidad tecnica: Sistemas exige Sala de Computo.")
     if materia.facultad == "Ciencias Básicas" and "AULA" not in nuevo_salon.nombre:
         raise HTTPException(status_code=400, detail="Incompatibilidad tecnica: Matematicas no se dicta en laboratorios.")
         
     inscritos = session.exec(select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == id_grupo)).one()
-    if list(grupos) and inscritos > nuevo_salon.capacidad:
+    if inscritos > nuevo_salon.capacidad:
         raise HTTPException(status_code=400, detail=f"Aforo excedido: Capacidad de {nuevo_salon.capacidad} para {inscritos} alumnos.")
         
     grupo.id_salon = nuevo_salon.id
@@ -201,7 +299,7 @@ def profesor_cambiar_salon(codigo_profesor: str, id_grupo: int, id_nuevo_salon: 
     publicador.suscribir(ObservadorConsola())             
     
     publicador.notificar_todos("CAMBIO_SALON", {"grupo_id": id_grupo, "nuevo_salon_id": id_nuevo_salon, "session": session})
-    return {"mensaje": "El evento disparo la IA y genero la alerta en la consola."}
+    return {"mensaje": "Validacion Genetica completada y salon actualizado en tiempo real."}
 
 @router.post("/admin/optimizar-horarios")
 def optimizar_infraestructura(codigo_admin: str, session: Session = Depends(get_session)):

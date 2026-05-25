@@ -7,19 +7,20 @@
         body { margin: 0; font-family: Arial, sans-serif; background: #f2f2f2; }
         .container { display: flex; height: 100vh; }
         .left { width: 25%; background: #0d1b4c; display: flex; flex-direction: column; }
-        .top-box { height: 50%; color: white; padding: 25px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; text-align: justify; font-size: 14px; box-sizing: border-box; overflow-y: auto; }
+        .top-box { height: 50%; color: white; padding: 25px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; text-align: center; font-size: 14px; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; }
         .linea { height: 2px; background: yellow; }
-        .bottom-box { height: 50%; position: relative; padding: 25px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; color: white; text-align: justify; font-size: 14px; overflow: hidden; display: flex; align-items: center;}
-        .bottom-box img { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0.3; z-index: 1; top:0; left:0; }
-        .bottom-box p { position: relative; z-index: 2; margin: 0; }
+        .bottom-box { height: 50%; position: relative; padding: 25px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; color: white; text-align: center; font-size: 14px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center;}
+        .bottom-box img { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0.3; z-index: 1; top:0; left:0; transition: opacity 0.5s ease-in-out; }
+        .texto-relativo { position: relative; z-index: 2; width: 100%; }
+        hr { border: none; border-top: 1px solid #4f79a6; width: 80%; opacity: 0.6; margin: 10px auto; }
         .right { width: 75%; background: #f2f2f2; padding: 20px; overflow-y: auto; box-sizing: border-box; }
         h1 { color: #0d1b4c; text-align: center; margin: 0 0 20px 0; font-size: 24px; }
         h3 { margin-top: 0; color: #0d1b4c; border-bottom: 2px solid #3b6ea5; padding-bottom: 5px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         td, th { border: 1px solid #ccc; padding: 10px; text-align: center; height: 60px; position: relative; }
         th { background: #3b6ea5; color: white; font-weight: bold; }
-        .materia { background: #4f79a6; color: white; border-radius: 5px; padding: 8px; font-size: 12px; font-weight: bold; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; }
-        .materia span { font-size: 10px; color: #ffeb3b; margin-top: 4px; }
+        .materia { background: #4f79a6; color: white; border-radius: 5px; padding: 8px; font-size: 12px; font-weight: bold; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; cursor: help; }
+        .materia span { font-size: 11px; color: #ffeb3b; margin-top: 6px; font-weight: 900; letter-spacing: 0.5px; }
         .vacio { background: #e5e5e5; min-height: 40px; border-radius: 3px; }
         button { padding: 10px 20px; background: #3b6ea5; color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; transition: background 0.2s; }
         button:hover { background: #2c4e75; }
@@ -36,13 +37,18 @@
 <div class="container">
     <div class="left">
         <div class="top-box">
-            <h3>Informacion</h3>
-            <p id="txt_superior">Sincronizando informacion institucional con la base de datos...</p>
+            <h3 id="msg_1" style="color:white; border-bottom: none; margin:0;">Cargando...</h3>
+            <hr>
+            <p id="msg_2">Sincronizando informacion institucional...</p>
         </div>
         <div class="linea"></div>
         <div class="bottom-box">
             <img id="img_lateral" src="">
-            <p id="txt_inferior">Cargando lineamientos institucionales de alta calidad...</p>
+            <div class="texto-relativo">
+                <h3 id="msg_3" style="color:#ffeb3b; border-bottom: none; margin:0;">Cargando...</h3>
+                <hr>
+                <p id="msg_4">Cargando lineamientos institucionales...</p>
+            </div>
         </div>
     </div>
 
@@ -52,20 +58,32 @@
             <button onclick="ejecutarLogout()" style="background: #dc3545;">Cerrar Sesion</button>
         </div>
 
-        <div id="vista_admin" class="oculto box-derecha" style="max-width: 600px; margin: 20px auto;">
-            <h3>Panel de Gestion de Interfaz Institucional</h3>
+        <div id="vista_admin" class="oculto box-derecha" style="max-width: 800px; margin: 20px auto;">
+            <h3>Panel de Gestion de Interfaz Institucional (Mensajes y Carrusel)</h3>
             
-            <label>Mensaje Panel Superior:</label>
-            <textarea id="inp_sup" rows="3" placeholder="Escriba el mensaje para el cuadro superior lateral..."></textarea>
+            <div style="display: flex; gap: 15px;">
+                <div style="flex: 1;">
+                    <label>Título Superior (Msg 1):</label>
+                    <input type="text" id="inp_m1" placeholder="Ej: BIENVENIDOS">
+                    <label>Texto Superior (Msg 2):</label>
+                    <textarea id="inp_m2" rows="3"></textarea>
+                </div>
+                <div style="flex: 1;">
+                    <label>Título Inferior (Msg 3):</label>
+                    <input type="text" id="inp_m3" placeholder="Ej: AVISO IMPORTANTE">
+                    <label>Texto Inferior (Msg 4):</label>
+                    <textarea id="inp_m4" rows="3"></textarea>
+                </div>
+            </div>
+
+            <hr>
+            <label>URLs del Carrusel de Imágenes (Máximo 3):</label>
+            <input type="text" id="inp_img1" placeholder="URL Imagen 1...">
+            <input type="text" id="inp_img2" placeholder="URL Imagen 2...">
+            <input type="text" id="inp_img3" placeholder="URL Imagen 3...">
             
-            <label>Mensaje Panel Inferior:</label>
-            <textarea id="inp_inf" rows="3" placeholder="Escriba el mensaje para el cuadro inferior lateral..."></textarea>
-            
-            <label>URL Imagen del Login / Lateral:</label>
-            <input type="text" id="inp_img" placeholder="https://ejemplo.com/universidad.jpg">
-            
-            <button onclick="guardarConfiguracionAdmin()" style="background:#28a745; width:100%; font-size: 15px; margin-bottom: 10px;">
-                Guardar Cambios para Todos los Usuarios
+            <button onclick="guardarConfiguracionAdmin()" style="background:#28a745; width:100%; font-size: 15px; margin-top: 10px;">
+                Guardar Configuración Global de Interfaz
             </button>
         </div>
 
@@ -83,7 +101,8 @@
                     <input type="text" id="ins_codigo" disabled style="background: #e9ecef; color: #555;">
                     
                     <label>Seleccionar Materia Disponible:</label>
-                    <select id="ins_materia">
+                    <select id="ins_materia" onchange="cargarGruposMateria()">
+                        <option value="">-- Seleccione una materia --</option>
                         <optgroup label="Facultad de Sistemas">
                             <option value="1">Algoritmia y programacion</option>
                             <option value="2">Introduccion a la Teoria de la Computacion</option>
@@ -97,36 +116,35 @@
                             <option value="8">Fisica II</option>
                         </optgroup>
                     </select>
+
+                    <label>Seleccionar Horario / Grupo:</label>
+                    <select id="ins_grupo">
+                        <option value="">Seleccione una materia primero...</option>
+                    </select>
                     
                     <button onclick="inscribirMateria()" style="width: 100%; background: #28a745; font-size: 14px;">
-                        Matricular y Asignar Grupo
+                        Matricular
                     </button>
+                    <div id="msg_estudiante" style="margin-top: 10px; font-weight: bold; font-size: 13px; text-align: center;"></div>
                 </div>
 
                 <div id="cuadro_profesor" class="oculto box-derecha">
                     <h3>Solicitar Cambio de Salon</h3>
                     
                     <label>Mis Materias Vigentes a Cargo:</label>
-                    <select id="sel_grupo_prof">
+                    <select id="sel_grupo_prof" onchange="cargarSalonesDisponibles()">
                     </select>
                     
-                    <label>Seleccionar Nuevo Salon Fijo:</label>
+                    <label>Seleccionar Nuevo Salon Disponible:</label>
                     <select id="sel_salon_prof">
-                        <optgroup label="Salas de Computo (Exclusivo Sistemas)">
-                            <option value="1">Sala de Computo 1 (Cap: 30)</option>
-                            <option value="2">Sala de Computo 2 (Cap: 30)</option>
-                            <option value="3">Sala de Computo 3 (Cap: 30)</option>
-                        </optgroup>
-                        <optgroup label="Aulas Teoricas (Exclusivo Ciencias Basicas)">
-                            <option value="8">AULA-301 (Cap: 35)</option>
-                            <option value="9">AULA-302 (Cap: 35)</option>
-                            <option value="10">AULA-303 (Cap: 35)</option>
-                        </optgroup>
+                        <option value="">Cargando salones...</option>
                     </select>
                     
                     <button onclick="solicitarCambioSalon()" style="width: 100%; font-size: 14px;">
                         Validar e Insertar Salon
                     </button>
+                    
+                    <div id="msg_prof" style="margin-top: 15px; font-weight: bold; font-size: 13px; text-align: center;"></div>
                 </div>
             </div>
         </div>
@@ -137,6 +155,16 @@
     const API = "http://127.0.0.1:8000";
     const rol = localStorage.getItem("userRole");
     const codigo = localStorage.getItem("userName");
+    
+    let imagenesCarrusel = [];
+    let imgIndex = 0;
+
+    function rotarImagen() {
+        if (imagenesCarrusel.length > 0) {
+            document.getElementById("img_lateral").src = imagenesCarrusel[imgIndex];
+            imgIndex = (imgIndex + 1) % imagenesCarrusel.length;
+        }
+    }
 
     document.addEventListener("DOMContentLoaded", () => {
         if (!codigo || !rol) { window.location.href = "/login"; return; }
@@ -144,14 +172,24 @@
         fetch(`${API}/front/config`)
         .then(res => res.json())
         .then(data => {
-            document.getElementById("txt_superior").innerText = data.mensaje_superior;
-            document.getElementById("txt_inferior").innerText = data.mensaje_inferior;
-            document.getElementById("img_lateral").src = data.url_imagen;
+            document.getElementById("msg_1").innerText = data.mensaje_1;
+            document.getElementById("msg_2").innerText = data.mensaje_2;
+            document.getElementById("msg_3").innerText = data.mensaje_3;
+            document.getElementById("msg_4").innerText = data.mensaje_4;
             
+            // Activar Carrusel
+            imagenesCarrusel = [data.url_img_1, data.url_img_2, data.url_img_3].filter(img => img.trim() !== "");
+            rotarImagen();
+            setInterval(rotarImagen, 4000); 
+
             if (rol === "Administrador") {
-                document.getElementById("inp_sup").value = data.mensaje_superior;
-                document.getElementById("inp_inf").value = data.mensaje_inferior;
-                document.getElementById("inp_img").value = data.url_imagen;
+                document.getElementById("inp_m1").value = data.mensaje_1;
+                document.getElementById("inp_m2").value = data.mensaje_2;
+                document.getElementById("inp_m3").value = data.mensaje_3;
+                document.getElementById("inp_m4").value = data.mensaje_4;
+                document.getElementById("inp_img1").value = data.url_img_1;
+                document.getElementById("inp_img2").value = data.url_img_2;
+                document.getElementById("inp_img3").value = data.url_img_3;
             }
         }).catch(err => console.warn("Modo contingencia local activado."));
 
@@ -192,16 +230,17 @@
                 dias.forEach(d => {
                     let celda = (horarioData[bloque] && horarioData[bloque][d]) ? horarioData[bloque][d] : null;
                     if (celda) {
+                        let hoverInfo = `Grupo: ${celda.num_grupo} | ${celda.info_extra}`;
                         html += `<td>
-                                    <div class="materia">
+                                    <div class="materia" title="${hoverInfo}">
                                         ${celda.materia}
-                                        <span> Salon: ${celda.salon}</span>
+                                        <span>📍 Salón: ${celda.salon}</span>
                                     </div>
                                  </td>`;
                         
                         if (rol === "Profesor" && celda.id_grupo && !gruposAgregados.includes(celda.id_grupo)) {
                             gruposAgregados.push(celda.id_grupo);
-                            selectProf.innerHTML += `<option value="${celda.id_grupo}">${celda.materia} (Ref: G-${celda.id_grupo})</option>`;
+                            selectProf.innerHTML += `<option value="${celda.id_grupo}">${celda.materia} (Ref: G-${celda.num_grupo})</option>`;
                         }
                     } else {
                         html += `<td><div class="vacio"></div></td>`;
@@ -210,23 +249,75 @@
                 html += `</tr>`;
             }
             tabla.innerHTML = html;
+            
+            if (rol === "Profesor" && gruposAgregados.length > 0) {
+                cargarSalonesDisponibles();
+            }
+        });
+    }
+
+    function cargarGruposMateria() {
+        const idMateria = document.getElementById("ins_materia").value;
+        const selectGrupo = document.getElementById("ins_grupo");
+        if (!idMateria) {
+            selectGrupo.innerHTML = '<option value="">Seleccione una materia primero...</option>';
+            return;
+        }
+
+        selectGrupo.innerHTML = '<option value="">Buscando horarios...</option>';
+
+        fetch(`${API}/materias/${idMateria}/grupos`)
+        .then(res => res.json())
+        .then(grupos => {
+            selectGrupo.innerHTML = "";
+            if (grupos.length === 0) {
+                selectGrupo.innerHTML = '<option value="">N/A (El sistema creará un grupo automático)</option>';
+            } else {
+                grupos.forEach(g => {
+                    let cuposDisponibles = g.limite - g.inscritos;
+                    selectGrupo.innerHTML += `<option value="${g.id_grupo}">Grupo ${g.num_grupo} | ${g.dia} - ${g.hora} (${cuposDisponibles} Cupos Restantes)</option>`;
+                });
+            }
+        });
+    }
+
+    function cargarSalonesDisponibles() {
+        const idGrupo = document.getElementById("sel_grupo_prof").value;
+        if (!idGrupo) return;
+
+        fetch(`${API}/profesor/salones-disponibles/${idGrupo}`)
+        .then(res => res.json())
+        .then(salones => {
+            const selectSalon = document.getElementById("sel_salon_prof");
+            selectSalon.innerHTML = "";
+            
+            if(salones.length === 0) {
+                selectSalon.innerHTML = '<option value="">No hay salones desocupados en este horario</option>';
+                return;
+            }
+            
+            salones.forEach(s => {
+                selectSalon.innerHTML += `<option value="${s.id}">${s.nombre} (Capacidad: ${s.capacidad})</option>`;
+            });
         });
     }
 
     function guardarConfiguracionAdmin() {
-        const sup = document.getElementById("inp_sup").value;
-        const inf = document.getElementById("inp_inf").value;
-        const img = document.getElementById("inp_img").value;
+        const payload = {
+            codigo_admin: codigo,
+            msg_1: document.getElementById("inp_m1").value,
+            msg_2: document.getElementById("inp_m2").value,
+            msg_3: document.getElementById("inp_m3").value,
+            msg_4: document.getElementById("inp_m4").value,
+            img_1: document.getElementById("inp_img1").value,
+            img_2: document.getElementById("inp_img2").value,
+            img_3: document.getElementById("inp_img3").value
+        };
 
         fetch(`${API}/front/config`, { 
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                codigo_admin: codigo,
-                mensaje_sup: sup,
-                mensaje_inf: inf,
-                url_img: img
-            })
+            body: JSON.stringify(payload)
         })
         .then(async res => {
             let data = await res.json();
@@ -240,21 +331,29 @@
 
     function inscribirMateria() {
         const idMateria = document.getElementById("ins_materia").value;
+        const idGrupo = document.getElementById("ins_grupo").value;
+        const msgDiv = document.getElementById("msg_estudiante");
         
+        if (!idMateria) { alert("Seleccione una materia"); return; }
+        
+        let payload = { codigo_usuario: codigo, id_materia: parseInt(idMateria) };
+        if (idGrupo) payload.id_grupo = parseInt(idGrupo);
+
         fetch(`${API}/inscribir`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                codigo_usuario: codigo,
-                id_materia: parseInt(idMateria)
-            })
+            body: JSON.stringify(payload)
         })
         .then(async res => {
             let data = await res.json();
-            if (!res.ok) alert("Error: " + (data.detail || "Error desconocido"));
-            else {
-                alert("Matricula exitosa procesada en seccion optimizada.");
-                renderizarHorarioDB(); 
+            if (!res.ok) {
+                msgDiv.style.color = "red";
+                msgDiv.innerText = "❌ " + (data.detail || "Error desconocido");
+            } else {
+                msgDiv.style.color = "green";
+                msgDiv.innerText = "✅ " + data.mensaje;
+                renderizarHorarioDB();
+                cargarGruposMateria(); 
             }
         }).catch(err => console.error(err));
     }
@@ -262,17 +361,27 @@
     function solicitarCambioSalon() {
         const idGrupo = document.getElementById("sel_grupo_prof").value;
         const idSalon = document.getElementById("sel_salon_prof").value;
+        const msgDiv = document.getElementById("msg_prof");
+        
         if (!idGrupo) { alert("Usted no posee materias a cargo en este periodo academico."); return; }
+        if (!idSalon) { alert("Debe seleccionar un salon valido."); return; }
+
+        msgDiv.innerText = "Procesando...";
+        msgDiv.style.color = "#333";
 
         fetch(`${API}/profesor/cambiar-salon?codigo_profesor=${codigo}&id_grupo=${idGrupo}&id_nuevo_salon=${idSalon}`, { 
             method: "PUT" 
         })
         .then(async res => {
             let data = await res.json();
-            if (!res.ok) alert("Error: " + data.detail);
-            else {
-                alert("Cambio realizado correctamente: " + data.mensaje);
+            if (!res.ok) {
+                msgDiv.style.color = "red";
+                msgDiv.innerText = "❌ Error: " + data.detail;
+            } else {
+                msgDiv.style.color = "green";
+                msgDiv.innerText = "✅ Éxito: " + data.mensaje;
                 renderizarHorarioDB();
+                cargarSalonesDisponibles(); 
             }
         });
     }

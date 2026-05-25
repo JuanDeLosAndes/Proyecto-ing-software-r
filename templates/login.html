@@ -6,11 +6,12 @@
     <style>
         body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; }
         .left { width: 30%; background: #0d1b4c; display: flex; flex-direction: column; }
-        .top-msg { height: 50%; display: flex; justify-content: center; align-items: center; color: white; text-align: justify; padding: 30px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; font-size: 14px; box-sizing: border-box; }
+        .top-msg { height: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 30px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; font-size: 14px; box-sizing: border-box; }
         .linea { height: 2px; background: yellow; }
-        .bottom-msg { height: 50%; position: relative; display: flex; justify-content: center; align-items: center; color: white; text-align: justify; padding: 30px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; font-size: 14px; box-sizing: border-box; overflow: hidden; }
-        .bottom-msg img { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0.3; z-index: 1; top:0; left:0; }
-        .bottom-msg p { position: relative; z-index: 2; }
+        .bottom-msg { height: 50%; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 30px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; font-size: 14px; box-sizing: border-box; overflow: hidden; }
+        .bottom-msg img { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0.3; z-index: 1; top:0; left:0; transition: opacity 0.5s ease-in-out; }
+        .texto-relativo { position: relative; z-index: 2; width: 100%; }
+        hr { border: none; border-top: 1px solid #4f79a6; width: 80%; opacity: 0.6; margin: 10px auto; }
         .right { width: 70%; background: #f2f2f2; display: flex; justify-content: center; align-items: center; }
         .login-box { text-align: center; }
         .icon { width: 120px; height: 120px; background: #1c2f4a; border-radius: 50%; margin: auto; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; color: orange; font-size: 40px; }
@@ -21,31 +22,56 @@
 </head>
 <body>
 <div class="left">
-    <div class="top-msg"><p id="mensaje_superior">Cargando anuncios institucionales...</p></div>
+    <div class="top-msg">
+        <div class="texto-relativo">
+            <h3 id="msg_1" style="margin-top:0;">Cargando...</h3>
+            <hr>
+            <p id="msg_2">Sincronizando información institucional.</p>
+        </div>
+    </div>
     <div class="linea"></div>
     <div class="bottom-msg">
         <img id="imagen_global" src="">
-        <p id="mensaje_inferior">Cargando...</p>
+        <div class="texto-relativo">
+            <h3 id="msg_3" style="margin-top:0; color: #ffeb3b;">Cargando...</h3>
+            <hr>
+            <p id="msg_4">Conectando a base de datos segura.</p>
+        </div>
     </div>
 </div>
 <div class="right">
     <div class="login-box">
         <div class="icon">👥</div>
-        <input type="text" id="usuario" placeholder="CÓDIGO">
+        <input type="text" id="usuario" placeholder="CÓDIGO INSTITUCIONAL">
         <input type="password" id="password" placeholder="CONTRASEÑA">
         <button onclick="ejecutarLogin()">INGRESAR</button>
     </div>
 </div>
 <script>
     const API = "http://127.0.0.1:8000";
+    let imagenesCarrusel = [];
+    let imgIndex = 0;
+
+    function rotarImagen() {
+        if (imagenesCarrusel.length > 0) {
+            document.getElementById("imagen_global").src = imagenesCarrusel[imgIndex];
+            imgIndex = (imgIndex + 1) % imagenesCarrusel.length;
+        }
+    }
 
     document.addEventListener("DOMContentLoaded", () => {
         fetch(`${API}/front/config`)
         .then(res => res.json())
         .then(data => {
-            document.getElementById("mensaje_superior").innerText = data.mensaje_superior;
-            document.getElementById("mensaje_inferior").innerText = data.mensaje_inferior;
-            document.getElementById("imagen_global").src = data.url_imagen;
+            document.getElementById("msg_1").innerText = data.mensaje_1;
+            document.getElementById("msg_2").innerText = data.mensaje_2;
+            document.getElementById("msg_3").innerText = data.mensaje_3;
+            document.getElementById("msg_4").innerText = data.mensaje_4;
+
+            // Extraer URLs válidas e iniciar carrusel
+            imagenesCarrusel = [data.url_img_1, data.url_img_2, data.url_img_3].filter(img => img.trim() !== "");
+            rotarImagen();
+            setInterval(rotarImagen, 4000); // Rota cada 4 segundos
         }).catch(err => console.log("Usando datos locales predeterminados por contingencia."));
     });
 
@@ -64,7 +90,7 @@
             localStorage.setItem("userName", data.codigo);
             window.location.href = "/asignacion";
         })
-        .catch(() => alert("Credenciales incorrectas. Verifique e intente nuevamente."));
+        .catch(() => alert("Credenciales incorrectas o ID no cumple con las políticas de formato."));
     }
 </script>
 </body>

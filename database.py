@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, create_engine, Session, select
+from sqlmodel import SQLModel, create_engine, Session, select, func
 from models import Salon, Materia, Rol, Usuario, Estudiante, Profesor, Administrador, ConfiguracionFront, Grupo, Inscripcion
 import random
 
@@ -20,18 +20,46 @@ def sembrar_datos_prueba(session: Session):
     if session.exec(select(Inscripcion)).first():
         return
 
-    print("Sembrando inscripciones aleatorias masivas para estresar la IA...")
+    print("Sembrando inscripciones masivas respetando aforos de la universidad...")
     estudiantes = session.exec(select(Estudiante)).all()
-    grupos = session.exec(select(Grupo)).all()
+    materias = session.exec(select(Materia)).all()
     
-    if estudiantes and grupos:
+    if estudiantes and materias:
         for est in estudiantes:
-            grupos_aleatorios = random.sample(grupos, 4) if len(grupos) >= 4 else grupos
-            for grupo in grupos_aleatorios:
-                insc = Inscripcion(id_estudiante=est.id, id_materia=grupo.id_materia, id_grupo=grupo.id, estado="Activo")
-                session.add(insc)
+            materias_aleatorias = random.sample(materias, 4) if len(materias) >= 4 else materias
+            for materia in materias_aleatorias:
+                limite_cupo = 30 if materia.facultad == "Sistemas" else 35
+                grupos_materia = session.exec(select(Grupo).where(Grupo.id_materia == materia.id)).all()
+                
+                grupo_asignado = None
+                for g in grupos_materia:
+                    inscritos = session.exec(select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == g.id)).one()
+                    if inscritos < limite_cupo:
+                        grupo_asignado = g
+                        break
+                
+                if not grupo_asignado:
+                    ultimo_grupo = grupos_materia[-1] if grupos_materia else None
+                    if ultimo_grupo:
+                        nuevo_grupo = Grupo(
+                            num_grupo=len(grupos_materia) + 1,
+                            id_materia=materia.id,
+                            id_salon=ultimo_grupo.id_salon, 
+                            id_profesor=ultimo_grupo.id_profesor,
+                            dia=ultimo_grupo.dia,
+                            hora=ultimo_grupo.hora
+                        )
+                        session.add(nuevo_grupo)
+                        session.commit()
+                        session.refresh(nuevo_grupo)
+                        grupo_asignado = nuevo_grupo
+
+                if grupo_asignado:
+                    insc = Inscripcion(id_estudiante=est.id, id_materia=materia.id, id_grupo=grupo_asignado.id, estado="Activo")
+                    session.add(insc)
+                    
         session.commit()
-        print(f"Se han matriculado {len(estudiantes)} estudiantes automaticamente en 4 materias cada uno.")
+        print(f"Se han matriculado {len(estudiantes)} estudiantes, creando los grupos necesarios para no exceder los límites.")
 
 def inicializar_sistema_completo(session: Session):
     if session.exec(select(Salon)).first(): return
@@ -42,13 +70,14 @@ def inicializar_sistema_completo(session: Session):
     session.add_all([rol_est, rol_prof, rol_admin])
     session.commit()
 
-    # =========================================================================
-    # NUEVOS MENSAJES INSTITUCIONALES (Sin emojis y con temática universitaria)
-    # =========================================================================
     config_inicial = ConfiguracionFront(
-        mensaje_superior="AVISO INSTITUCIONAL: Se acercan los examenes parciales. Por favor, verifiquen sus horarios y salones asignados con anticipacion para evitar contratiempos de ultima hora.",
-        mensaje_inferior="INFORMACION: Recuerde realizar la evaluacion docente desde su portal antes del cierre del semestre. Su opinion es vital para mantener la alta calidad de la universidad.",
-        url_imagen="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=600"
+        mensaje_1="BIENVENIDO AL PORTAL UNIVERSITARIO",
+        mensaje_2="Verifique sus horarios y salones asignados con anticipación para los próximos parciales.",
+        mensaje_3="INFORMACIÓN IMPORTANTE",
+        mensaje_4="Recuerde realizar la evaluación docente desde su portal antes del cierre del semestre.",
+        url_img_1="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=600",
+        url_img_2="https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=600",
+        url_img_3="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=600"
     )
     session.add(config_inicial)
 
@@ -71,22 +100,26 @@ def inicializar_sistema_completo(session: Session):
         lista_materias.append(mat)
     session.commit()
 
-    print("Generando 140 estudiantes y profesores de prueba...")
+    print("Generando 140 estudiantes y profesores de prueba con nuevas reglas de ID...")
     usuarios_estudiantes = []
     for i in range(1, 141):
-        u = Usuario(codigo=f"E{1000+i}", contrasena="123", id_rol=rol_est.id)
+        # 6700 + 4 dígitos (Ej: 67001001) -> Total 8 dígitos
+        u = Usuario(codigo=f"6700{1000+i}", contrasena="123", id_rol=rol_est.id)
         session.add(u)
         usuarios_estudiantes.append(u)
 
-    u_prof1 = Usuario(codigo="75004321", contrasena="123", id_rol=rol_prof.id) 
-    u_prof2 = Usuario(codigo="9999", contrasena="4321", id_rol=rol_prof.id)     
+    # Profesores: 10 dígitos sin empezar en 6700 ni 9900
+    u_prof1 = Usuario(codigo="1000000001", contrasena="123", id_rol=rol_prof.id) 
+    u_prof2 = Usuario(codigo="1000000002", contrasena="4321", id_rol=rol_prof.id)     
+    
+    # Admin: 9900 + 4 dígitos -> Total 8 dígitos
     u_adm = Usuario(codigo="99001111", contrasena="123", id_rol=rol_admin.id)
     
     session.add_all([u_prof1, u_prof2, u_adm])
     session.commit()
 
     for i, u in enumerate(usuarios_estudiantes):
-        perfil = Estudiante(nombre=f"Estudiante de Prueba {i+1}", id_usuario=u.id)
+        perfil = Estudiante(nombre=f"Estudiante {u.codigo}", id_usuario=u.id)
         session.add(perfil)
 
     perfil_prof1 = Profesor(nombre="Carlos Mendoza", especialidad="Ingeniería de Sistemas", id_usuario=u_prof1.id)

@@ -43,7 +43,7 @@ class Salon(SQLModel, table=True):
 class Grupo(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     num_grupo: int
-    cupo_maximo: int = 35
+    cupo_maximo: int = 30 
     id_materia: Optional[int] = Field(default=None, foreign_key="materia.id")
     id_salon: Optional[int] = Field(default=None, foreign_key="salon.id")
     id_profesor: Optional[int] = Field(default=None, foreign_key="profesor.id")
@@ -59,6 +59,10 @@ class Inscripcion(SQLModel, table=True):
 
 class ConfiguracionFront(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    mensaje_superior: str
-    mensaje_inferior: str
-    url_imagen: str
+    mensaje_1: str
+    mensaje_2: str
+    mensaje_3: str
+    mensaje_4: str
+    url_img_1: str
+    url_img_2: str
+    url_img_3: str

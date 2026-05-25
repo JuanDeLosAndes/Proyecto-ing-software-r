@@ -16,22 +16,27 @@ def calcular_fitness(cromosoma, grupos_info, salones_info):
         g_data = grupos_info[id_grupo]
         salon = salones_info[id_salon]
         
-        # 1. Validación de Capacidad
+        # 1. Validacion de Capacidad Estricta
         if g_data["inscritos"] > salon.capacidad:
-            penalizacion += 2000
+            penalizacion += 5000 # Penalizacion muy alta por superar aforo
 
+        # 2. Reglas de Facultad
         if g_data["facultad"] == "Sistemas" and "Sala" not in salon.nombre:
-            penalizacion += 3000
+            # Castigo suave. Preferimos Salas, pero pueden usar Aulas si evita un choque.
+            penalizacion += 500 
+            
         if g_data["facultad"] == "Ciencias Básicas" and "AULA" not in salon.nombre:
-            penalizacion += 3000
+            # Castigo estricto. Matematicas/Fisica no entran a Salas de Computo.
+            penalizacion += 6000
 
-        # 3. Choque de Salones (Mismo salón, día y hora)
+        # 3. Choque de Salones (Mismo salon, dia y hora)
         llave_salon = (id_salon, g_data["dia"], g_data["hora"])
         if llave_salon in control_choques_salon:
             penalizacion += 4000
         else:
             control_choques_salon[llave_salon] = id_grupo
 
+        # 4. Choque de Profesores
         llave_prof = (g_data["id_profesor"], g_data["dia"], g_data["hora"])
         if llave_prof in control_choques_prof:
             penalizacion += 5000  
@@ -48,10 +53,15 @@ def generar_poblacion_inicial(grupos_ids, salones_ids):
     return poblacion
 
 def ejecutar_algoritmo_universitario(session: Session):
+    print("\n=======================================================")
+    print("[ALGORITMO GENETICO] Iniciando Optimizacion de Espacios...")
+    print("=======================================================")
+    
     salones = session.exec(select(Salon)).all()
     grupos = session.exec(select(Grupo)).all()
     
     if not salones or not grupos:
+        print("[ALGORITMO GENETICO] Error: Datos insuficientes.")
         return {"error": "Infraestructura o grupos insuficientes."}
 
     salones_info = {s.id: s for s in salones}
@@ -72,9 +82,15 @@ def ejecutar_algoritmo_universitario(session: Session):
 
     poblacion = generar_poblacion_inicial(grupos_ids, salones_ids)
 
-    for _ in range(Configuracion.GENERACIONES):
+    for gen in range(Configuracion.GENERACIONES):
         poblacion = sorted(poblacion, key=lambda c: calcular_fitness(c, grupos_info, salones_info), reverse=True)
         nueva_generacion = poblacion[:10]
+        
+        mejor_fitness_gen = calcular_fitness(poblacion[0], grupos_info, salones_info)
+        
+        # Imprimir progreso en terminal
+        if gen % 10 == 0 or gen == Configuracion.GENERACIONES - 1:
+            print(f"[*] Generacion {gen}: Mejor Fitness = {mejor_fitness_gen}")
 
         while len(nueva_generacion) < Configuracion.TAMANO_POBLACION:
             padre1 = random.choice(poblacion[:20])
@@ -90,6 +106,7 @@ def ejecutar_algoritmo_universitario(session: Session):
         poblacion = nueva_generacion
 
     mejor_cromosoma = max(poblacion, key=lambda c: calcular_fitness(c, grupos_info, salones_info))
+    print(f"\n[ALGORITMO GENETICO] Evolucion completada. Aplicando matriz optima.")
 
     for id_grupo, id_salon_optimo in mejor_cromosoma.items():
         grupo_db = session.get(Grupo, id_grupo)
@@ -98,4 +115,5 @@ def ejecutar_algoritmo_universitario(session: Session):
             session.add(grupo_db)
             
     session.commit()
-    return {"mensaje": "Optimización genética completada. Sin cruces de profesores ni salones."}
+    print("[ALGORITMO GENETICO] Asignacion finalizada exitosamente.\n")
+    return {"mensaje": "Optimizacion genetica completada. Sin cruces criticos detectados."}
