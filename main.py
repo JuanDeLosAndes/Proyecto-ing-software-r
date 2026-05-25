@@ -8,7 +8,6 @@ from api import router as api_router
 
 app = FastAPI(title="Sistema de Asignación de Salones")
 
-# ¡ESTA ES LA LÍNEA CLAVE QUE FALTABA CONECTAR!
 app.include_router(api_router)
 
 if os.path.exists("static"):

@@ -10,7 +10,7 @@ class Configuracion:
 def calcular_fitness(cromosoma, grupos_info, salones_info):
     penalizacion = 0
     control_choques_salon = {}
-    control_choques_prof = {} # Rastreador de cruces para profesores
+    control_choques_prof = {} 
 
     for id_grupo, id_salon in cromosoma.items():
         g_data = grupos_info[id_grupo]
@@ -20,7 +20,6 @@ def calcular_fitness(cromosoma, grupos_info, salones_info):
         if g_data["inscritos"] > salon.capacidad:
             penalizacion += 2000
 
-        # 2. Validación de Facultad vs Infraestructura
         if g_data["facultad"] == "Sistemas" and "Sala" not in salon.nombre:
             penalizacion += 3000
         if g_data["facultad"] == "Ciencias Básicas" and "AULA" not in salon.nombre:
@@ -33,10 +32,9 @@ def calcular_fitness(cromosoma, grupos_info, salones_info):
         else:
             control_choques_salon[llave_salon] = id_grupo
 
-        # 4. Choque de Profesores (Mismo profesor, día y hora en salones distintos)
         llave_prof = (g_data["id_profesor"], g_data["dia"], g_data["hora"])
         if llave_prof in control_choques_prof:
-            penalizacion += 5000  # Castigo máximo: Un profesor no puede estar en dos lugares
+            penalizacion += 5000  
         else:
             control_choques_prof[llave_prof] = id_grupo
 
@@ -69,7 +67,7 @@ def ejecutar_algoritmo_universitario(session: Session):
             "hora": g.hora,
             "facultad": materia.facultad if materia else "Ciencias Básicas",
             "inscritos": inscritos_count,
-            "id_profesor": g.id_profesor # Mapeamos el profesor para validarlo
+            "id_profesor": g.id_profesor 
         }
 
     poblacion = generar_poblacion_inicial(grupos_ids, salones_ids)

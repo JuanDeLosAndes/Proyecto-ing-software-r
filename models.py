@@ -3,7 +3,7 @@ from typing import Optional
 
 class Rol(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    nombre_rol: str  # "Estudiante", "Administrador", "Profesor"
+    nombre_rol: str  # Estudiante, Administrador, Profesor
 
 class Usuario(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -32,7 +32,7 @@ class Materia(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     nombre: str
     creditos: int
-    facultad: str  # "Sistemas" o "Ciencias Básicas"
+    facultad: str  # Sistemas o Ciencias Basicas
     semestre: int
 
 class Salon(SQLModel, table=True):
@@ -47,15 +47,15 @@ class Grupo(SQLModel, table=True):
     id_materia: Optional[int] = Field(default=None, foreign_key="materia.id")
     id_salon: Optional[int] = Field(default=None, foreign_key="salon.id")
     id_profesor: Optional[int] = Field(default=None, foreign_key="profesor.id")
-    dia: Optional[str] = None   # "Lunes", "Martes", "Miercoles", "Jueves", "Viernes"
-    hora: Optional[str] = None  # "7:00", "9:00", "11:00", etc.
+    dia: Optional[str] = None   
+    hora: Optional[str] = None  
 
 class Inscripcion(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     id_estudiante: Optional[int] = Field(default=None, foreign_key="estudiante.id")
     id_materia: Optional[int] = Field(default=None, foreign_key="materia.id")
     id_grupo: Optional[int] = Field(default=None, foreign_key="grupo.id")
-    estado: str  # "Activo"
+    estado: str  # Activo
 
 class ConfiguracionFront(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Sistema de Asignación Universitaria</title>
+    <title>Sistema de Asignacion Universitaria</title>
     <style>
         body { margin: 0; font-family: Arial, sans-serif; background: #f2f2f2; }
         .container { display: flex; height: 100vh; }
@@ -26,10 +26,9 @@
         .oculto { display: none !important; }
         .panel-flex { display: flex; gap: 20px; align-items: flex-start; }
         .tabla-wrapper { flex: 2; overflow-x: auto; }
-        .box-derecha { flex: 1; background: white; padding: 20px; border-radius: 10px; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .box-derecha { flex: 1; background: white; padding: 20px; border-radius: 10px; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
         label { display: block; font-size: 13px; font-weight: bold; color: #333; margin-bottom: 5px; text-align: left; }
         textarea, input, select { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-family: Arial, sans-serif; }
-        textarea { resize: vertical; }
     </style>
 </head>
 <body>
@@ -37,8 +36,8 @@
 <div class="container">
     <div class="left">
         <div class="top-box">
-            <h3>Información</h3>
-            <p id="txt_superior">Sincronizando información institucional con la base de datos...</p>
+            <h3>Informacion</h3>
+            <p id="txt_superior">Sincronizando informacion institucional con la base de datos...</p>
         </div>
         <div class="linea"></div>
         <div class="bottom-box">
@@ -49,12 +48,12 @@
 
     <div class="right">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 10px; border: 1px solid #ccc;">
-            <h1 id="txt_rol" style="margin: 0; font-size: 20px;">Cargando Sesión...</h1>
-            <button onclick="ejecutarLogout()" style="background: #dc3545;">Cerrar Sesión</button>
+            <h1 id="txt_rol" style="margin: 0; font-size: 20px;">Cargando Sesion...</h1>
+            <button onclick="ejecutarLogout()" style="background: #dc3545;">Cerrar Sesion</button>
         </div>
 
         <div id="vista_admin" class="oculto box-derecha" style="max-width: 600px; margin: 20px auto;">
-            <h3>⚙️ Panel de Gestión de Interfaz Institucional</h3>
+            <h3>Panel de Gestion de Interfaz Institucional</h3>
             
             <label>Mensaje Panel Superior:</label>
             <textarea id="inp_sup" rows="3" placeholder="Escriba el mensaje para el cuadro superior lateral..."></textarea>
@@ -66,7 +65,7 @@
             <input type="text" id="inp_img" placeholder="https://ejemplo.com/universidad.jpg">
             
             <button onclick="guardarConfiguracionAdmin()" style="background:#28a745; width:100%; font-size: 15px; margin-bottom: 10px;">
-                💾 Guardar Cambios para Todos los Usuarios
+                Guardar Cambios para Todos los Usuarios
             </button>
         </div>
 
@@ -76,39 +75,59 @@
                 </table>
             </div>
 
-            <div id="cuadro_profesor" class="oculto box-derecha">
-                <h3>🔄 Solicitar Cambio de Salón</h3>
-                
-                <label>Mis Materias Vigentes a Cargo:</label>
-                <select id="sel_grupo_prof">
-                </select>
-                
-                <label>Seleccionar Nuevo Salón Fijo:</label>
-                <select id="sel_salon_prof">
-                    <optgroup label="Salas de Cómputo (Exclusivo Sistemas)">
-                        <option value="1">Sala de Cómputo 1 (Cap: 20)</option>
-                        <option value="2">Sala de Cómputo 2 (Cap: 20)</option>
-                        <option value="3">Sala de Cómputo 3 (Cap: 20)</option>
-                        <option value="4">Sala de Cómputo 4 (Cap: 20)</option>
-                        <option value="5">Sala de Cómputo 5 (Cap: 20)</option>
-                        <option value="6">Sala de Cómputo 6 (Cap: 20)</option>
-                        <option value="7">Sala de Cómputo 7 (Cap: 30)</option>
-                    </optgroup>
-                    <optgroup label="Aulas Teóricas (Exclusivo Ciencias Básicas)">
-                        <option value="8">AULA-301 (Cap: 25)</option>
-                        <option value="9">AULA-302 (Cap: 30)</option>
-                        <option value="10">AULA-303 (Cap: 35)</option>
-                        <option value="11">AULA-304 (Cap: 28)</option>
-                        <option value="12">AULA-305 (Cap: 32)</option>
-                        <option value="13">AULA-306 (Cap: 26)</option>
-                        <option value="14">AULA-307 (Cap: 34)</option>
-                        <option value="15">AULA-308 (Cap: 30)</option>
-                    </optgroup>
-                </select>
-                
-                <button onclick="solicitarCambioSalon()" style="width: 100%; font-size: 14px;">
-                    ⚡ Validar e Insertar Salón
-                </button>
+            <div>
+                <div id="cuadro_estudiante" class="oculto box-derecha">
+                    <h3>Inscribir Nueva Materia</h3>
+                    
+                    <label>Mi Codigo Estudiantil:</label>
+                    <input type="text" id="ins_codigo" disabled style="background: #e9ecef; color: #555;">
+                    
+                    <label>Seleccionar Materia Disponible:</label>
+                    <select id="ins_materia">
+                        <optgroup label="Facultad de Sistemas">
+                            <option value="1">Algoritmia y programacion</option>
+                            <option value="2">Introduccion a la Teoria de la Computacion</option>
+                            <option value="3">Diseno y Programacion Orientados a Objetos</option>
+                            <option value="4">Estructuras de Datos</option>
+                        </optgroup>
+                        <optgroup label="Facultad de Ciencias Basicas">
+                            <option value="5">Fundamentacion matematica</option>
+                            <option value="6">Calculo diferencial</option>
+                            <option value="7">Fisica I</option>
+                            <option value="8">Fisica II</option>
+                        </optgroup>
+                    </select>
+                    
+                    <button onclick="inscribirMateria()" style="width: 100%; background: #28a745; font-size: 14px;">
+                        Matricular y Asignar Grupo
+                    </button>
+                </div>
+
+                <div id="cuadro_profesor" class="oculto box-derecha">
+                    <h3>Solicitar Cambio de Salon</h3>
+                    
+                    <label>Mis Materias Vigentes a Cargo:</label>
+                    <select id="sel_grupo_prof">
+                    </select>
+                    
+                    <label>Seleccionar Nuevo Salon Fijo:</label>
+                    <select id="sel_salon_prof">
+                        <optgroup label="Salas de Computo (Exclusivo Sistemas)">
+                            <option value="1">Sala de Computo 1 (Cap: 30)</option>
+                            <option value="2">Sala de Computo 2 (Cap: 30)</option>
+                            <option value="3">Sala de Computo 3 (Cap: 30)</option>
+                        </optgroup>
+                        <optgroup label="Aulas Teoricas (Exclusivo Ciencias Basicas)">
+                            <option value="8">AULA-301 (Cap: 35)</option>
+                            <option value="9">AULA-302 (Cap: 35)</option>
+                            <option value="10">AULA-303 (Cap: 35)</option>
+                        </optgroup>
+                    </select>
+                    
+                    <button onclick="solicitarCambioSalon()" style="width: 100%; font-size: 14px;">
+                        Validar e Insertar Salon
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -136,14 +155,18 @@
             }
         }).catch(err => console.warn("Modo contingencia local activado."));
 
-        document.getElementById("txt_rol").innerText = `Panel Institucional: ${rol} — Código: ${codigo}`;
+        document.getElementById("txt_rol").innerText = `Panel Institucional: ${rol} — Codigo: ${codigo}`;
 
         if (rol === "Administrador") {
             document.getElementById("vista_admin").classList.remove("oculto");
         } else {
             document.getElementById("vista_horario").classList.remove("oculto");
+            
             if (rol === "Profesor") {
                 document.getElementById("cuadro_profesor").classList.remove("oculto");
+            } else if (rol === "Estudiante") {
+                document.getElementById("cuadro_estudiante").classList.remove("oculto");
+                document.getElementById("ins_codigo").value = codigo;
             }
             renderizarHorarioDB();
         }
@@ -172,7 +195,7 @@
                         html += `<td>
                                     <div class="materia">
                                         ${celda.materia}
-                                        <span>📍 ${celda.salon}</span>
+                                        <span> Salon: ${celda.salon}</span>
                                     </div>
                                  </td>`;
                         
@@ -195,33 +218,60 @@
         const inf = document.getElementById("inp_inf").value;
         const img = document.getElementById("inp_img").value;
 
-        fetch(`${API}/front/config?mensaje_sup=${encodeURIComponent(sup)}&mensaje_inf=${encodeURIComponent(inf)}&url_img=${encodeURIComponent(img)}&codigo_admin=${codigo}`, { 
-            method: "POST" 
+        fetch(`${API}/front/config`, { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                codigo_admin: codigo,
+                mensaje_sup: sup,
+                mensaje_inf: inf,
+                url_img: img
+            })
         })
-        .then(res => {
-            if (!res.ok) throw new Error();
-            return res.json();
-        })
-        .then(() => {
-            alert("Base de datos de interfaz actualizada globalmente con éxito.");
-            location.reload();
-        }).catch(() => alert("Error de privilegios al actualizar la interfaz institucional."));
+        .then(async res => {
+            let data = await res.json();
+            if (!res.ok) alert("Error: " + data.detail);
+            else {
+                alert("Base de datos de interfaz actualizada globalmente con exito.");
+                location.reload();
+            }
+        });
     }
 
-    // Al solicitar el cambio, se disparará internamente el Algoritmo Genético
+    function inscribirMateria() {
+        const idMateria = document.getElementById("ins_materia").value;
+        
+        fetch(`${API}/inscribir`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                codigo_usuario: codigo,
+                id_materia: parseInt(idMateria)
+            })
+        })
+        .then(async res => {
+            let data = await res.json();
+            if (!res.ok) alert("Error: " + (data.detail || "Error desconocido"));
+            else {
+                alert("Matricula exitosa procesada en seccion optimizada.");
+                renderizarHorarioDB(); 
+            }
+        }).catch(err => console.error(err));
+    }
+
     function solicitarCambioSalon() {
         const idGrupo = document.getElementById("sel_grupo_prof").value;
         const idSalon = document.getElementById("sel_salon_prof").value;
-        if (!idGrupo) { alert("Usted no posee materias a cargo en este periodo académico."); return; }
+        if (!idGrupo) { alert("Usted no posee materias a cargo en este periodo academico."); return; }
 
         fetch(`${API}/profesor/cambiar-salon?codigo_profesor=${codigo}&id_grupo=${idGrupo}&id_nuevo_salon=${idSalon}`, { 
             method: "PUT" 
         })
         .then(async res => {
             let data = await res.json();
-            if (!res.ok) alert("❌ " + data.detail);
+            if (!res.ok) alert("Error: " + data.detail);
             else {
-                alert("✅ " + data.mensaje);
+                alert("Cambio realizado correctamente: " + data.mensaje);
                 renderizarHorarioDB();
             }
         });
