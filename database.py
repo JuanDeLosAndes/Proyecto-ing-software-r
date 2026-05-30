@@ -1,16 +1,27 @@
+import os
 from sqlmodel import SQLModel, create_engine, Session
+from modelos.entidades import (
+    Salon, Materia, Rol, Usuario, Estudiante,
+    Profesor, Administrador, ConfigFront, Grupo, Inscripcion, SesionToken
+)
 
-# Importamos todos los modelos para que SQLModel sepa qué tablas crear en la base de datos
-from models import Salon, Materia, Rol, Usuario, Estudiante, Profesor, Administrador, ConfiguracionFront, Grupo, Inscripcion
 
-sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
+class ConexionBD:
+    _instancia = None
 
-def create_db_and_tables():
-    # Solo crea las tablas vacías en la base de datos sin inyectar datos de prueba
-    SQLModel.metadata.create_all(engine)
+    @classmethod
+    def ObtenerMotor(cls):
+        if cls._instancia is None:
+            url = os.getenv("DATABASE_URL", "sqlite:///database.db")
+            args = {"check_same_thread": False} if url.startswith("sqlite") else {}
+            cls._instancia = create_engine(url, connect_args=args)
+        return cls._instancia
 
-def get_session():
-    with Session(engine) as session:
-        yield session
+
+def CrearTa():
+    SQLModel.metadata.create_all(ConexionBD.ObtenerMotor())
+
+
+def ObtenerSes():
+    with Session(ConexionBD.ObtenerMotor()) as ses:
+        yield ses

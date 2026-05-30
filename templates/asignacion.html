@@ -2,393 +2,507 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Sistema de Asignacion Universitaria</title>
+    <title>Asignación de Salones</title>
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; background: #f2f2f2; }
-        .container { display: flex; height: 100vh; }
-        .left { width: 25%; background: #0d1b4c; display: flex; flex-direction: column; }
-        .top-box { height: 50%; color: white; padding: 25px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; text-align: center; font-size: 14px; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; }
-        .linea { height: 2px; background: yellow; }
-        .bottom-box { height: 50%; position: relative; padding: 25px; margin: 10px; border: 2px solid #4f79a6; border-radius: 10px; color: white; text-align: center; font-size: 14px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center;}
-        .bottom-box img { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0.3; z-index: 1; top:0; left:0; transition: opacity 0.5s ease-in-out; }
-        .texto-relativo { position: relative; z-index: 2; width: 100%; }
-        hr { border: none; border-top: 1px solid #4f79a6; width: 80%; opacity: 0.6; margin: 10px auto; }
-        .right { width: 75%; background: #f2f2f2; padding: 20px; overflow-y: auto; box-sizing: border-box; }
-        h1 { color: #0d1b4c; text-align: center; margin: 0 0 20px 0; font-size: 24px; }
-        h3 { margin-top: 0; color: #0d1b4c; border-bottom: 2px solid #3b6ea5; padding-bottom: 5px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        td, th { border: 1px solid #ccc; padding: 10px; text-align: center; height: 60px; position: relative; }
-        th { background: #3b6ea5; color: white; font-weight: bold; }
-        .materia { background: #4f79a6; color: white; border-radius: 5px; padding: 8px; font-size: 12px; font-weight: bold; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; cursor: help; }
-        .materia span { font-size: 11px; color: #ffeb3b; margin-top: 6px; font-weight: 900; letter-spacing: 0.5px; }
-        .vacio { background: #e5e5e5; min-height: 40px; border-radius: 3px; }
-        button { padding: 10px 20px; background: #3b6ea5; color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; transition: background 0.2s; }
-        button:hover { background: #2c4e75; }
-        .oculto { display: none !important; }
-        .panel-flex { display: flex; gap: 20px; align-items: flex-start; }
-        .tabla-wrapper { flex: 2; overflow-x: auto; }
-        .box-derecha { flex: 1; background: white; padding: 20px; border-radius: 10px; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        label { display: block; font-size: 13px; font-weight: bold; color: #333; margin-bottom: 5px; text-align: left; }
-        textarea, input, select { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-family: Arial, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; display: flex; height: 100vh; background: #f2f2f2; }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            width: 260px; min-width: 260px; background: #0d1b4c;
+            color: white; display: flex; flex-direction: column;
+            padding: 20px; gap: 12px;
+        }
+        .sidebar h2 { font-size: 15px; text-align: center; border-bottom: 1px solid #4f79a6; padding-bottom: 12px; }
+        .sidebar .info { background: #1c2f4a; border-radius: 8px; padding: 12px; font-size: 13px; }
+        .sidebar .info span { color: #a8c5e8; display: block; margin-bottom: 4px; }
+        .sidebar .info strong { font-size: 15px; }
+        .sidebar nav { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+        .sidebar nav button {
+            background: #4f79a6; color: white; border: none;
+            border-radius: 8px; padding: 10px; cursor: pointer;
+            font-size: 13px; text-align: left; transition: background 0.2s;
+        }
+        .sidebar nav button:hover, .sidebar nav button.activo { background: #35597c; }
+        .btn-logout {
+            margin-top: auto; background: #8b2e2e; color: white;
+            border: none; border-radius: 8px; padding: 10px;
+            cursor: pointer; font-size: 13px; transition: background 0.2s;
+        }
+        .btn-logout:hover { background: #a83232; }
+
+        /* ── CONTENIDO ── */
+        .contenido { flex: 1; overflow-y: auto; padding: 24px; }
+        .panel { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .panel h3 { color: #0d1b4c; margin-bottom: 16px; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px; }
+
+        /* ── HORARIO ── */
+        .tabla-horario { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .tabla-horario th { background: #0d1b4c; color: white; padding: 10px 8px; text-align: center; }
+        .tabla-horario td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: middle; min-width: 100px; }
+        .tabla-horario td.ocupado { background: #e8f0fe; }
+        .tabla-horario td.ocupado strong { display: block; color: #0d1b4c; }
+        .tabla-horario td.ocupado small { color: #555; font-size: 11px; }
+        .tabla-horario td.vacio { background: #fafafa; color: #bbb; }
+
+        /* ── MENSAJES ── */
+        .msg-error { background: #ffe0e0; color: #c0392b; border: 1px solid #f5c6cb; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: none; }
+        .msg-exito { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: none; }
+
+        /* ── FORMULARIOS ── */
+        select, input[type="number"] {
+            padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc;
+            font-size: 13px; margin-right: 8px; margin-bottom: 8px;
+        }
+        .btn-accion {
+            background: #4f79a6; color: white; border: none;
+            border-radius: 8px; padding: 10px 20px;
+            cursor: pointer; font-size: 13px; transition: background 0.2s;
+        }
+        .btn-accion:hover { background: #35597c; }
+        .btn-accion.verde { background: #27ae60; }
+        .btn-accion.verde:hover { background: #1e8449; }
+        .btn-accion.rojo { background: #c0392b; }
+        .btn-accion.rojo:hover { background: #962d22; }
+
+        /* ── SPINNER ── */
+        .cargando { text-align: center; color: #888; padding: 30px; font-size: 14px; }
+
+        /* ── TABLA GRUPOS ── */
+        .tabla-grupos { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+        .tabla-grupos th { background: #4f79a6; color: white; padding: 8px; text-align: left; }
+        .tabla-grupos td { border-bottom: 1px solid #eee; padding: 8px; }
+        .tabla-grupos tr:hover td { background: #f5f8ff; }
+        .badge {
+            display: inline-block; padding: 3px 8px; border-radius: 12px;
+            font-size: 11px; font-weight: bold;
+        }
+        .badge.verde { background: #d4edda; color: #155724; }
+        .badge.rojo { background: #ffe0e0; color: #c0392b; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="left">
-        <div class="top-box">
-            <h3 id="msg_1" style="color:white; border-bottom: none; margin:0;">Cargando...</h3>
-            <hr>
-            <p id="msg_2">Sincronizando informacion institucional...</p>
-        </div>
-        <div class="linea"></div>
-        <div class="bottom-box">
-            <img id="img_lateral" src="">
-            <div class="texto-relativo">
-                <h3 id="msg_3" style="color:#ffeb3b; border-bottom: none; margin:0;">Cargando...</h3>
-                <hr>
-                <p id="msg_4">Cargando lineamientos institucionales...</p>
-            </div>
-        </div>
+<!-- ── SIDEBAR ── -->
+<div class="sidebar">
+    <h2>🎓 Universidad Católica<br>de Colombia</h2>
+
+    <div class="info">
+        <span>Código:</span>
+        <strong id="sb-codigo">{{ codigo }}</strong>
+        <span style="margin-top:8px;">Rol:</span>
+        <strong id="sb-rol">{{ rol }}</strong>
     </div>
 
-    <div class="right">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 10px; border: 1px solid #ccc;">
-            <h1 id="txt_rol" style="margin: 0; font-size: 20px;">Cargando Sesion...</h1>
-            <button onclick="ejecutarLogout()" style="background: #dc3545;">Cerrar Sesion</button>
-        </div>
+    <nav id="nav-menu">
+        <button class="activo" onclick="mostrarSeccion('horario')">📅 Mi Horario</button>
+        <!-- Los botones adicionales se inyectan según el rol -->
+    </nav>
 
-        <div id="vista_admin" class="oculto box-derecha" style="max-width: 800px; margin: 20px auto;">
-            <h3>Panel de Gestion de Interfaz Institucional (Mensajes y Carrusel)</h3>
-            
-            <div style="display: flex; gap: 15px;">
-                <div style="flex: 1;">
-                    <label>Título Superior (Msg 1):</label>
-                    <input type="text" id="inp_m1" placeholder="Ej: BIENVENIDOS">
-                    <label>Texto Superior (Msg 2):</label>
-                    <textarea id="inp_m2" rows="3"></textarea>
-                </div>
-                <div style="flex: 1;">
-                    <label>Título Inferior (Msg 3):</label>
-                    <input type="text" id="inp_m3" placeholder="Ej: AVISO IMPORTANTE">
-                    <label>Texto Inferior (Msg 4):</label>
-                    <textarea id="inp_m4" rows="3"></textarea>
-                </div>
-            </div>
+    <button class="btn-logout" onclick="cerrarSesion()">🔒 Cerrar Sesión</button>
+</div>
 
-            <hr>
-            <label>URLs del Carrusel de Imágenes (Máximo 3):</label>
-            <input type="text" id="inp_img1" placeholder="URL Imagen 1...">
-            <input type="text" id="inp_img2" placeholder="URL Imagen 2...">
-            <input type="text" id="inp_img3" placeholder="URL Imagen 3...">
-            
-            <button onclick="guardarConfiguracionAdmin()" style="background:#28a745; width:100%; font-size: 15px; margin-top: 10px;">
-                Guardar Configuración Global de Interfaz
-            </button>
-        </div>
-
-        <div id="vista_horario" class="oculto panel-flex">
-            <div class="tabla-wrapper">
-                <table id="tabla_clases">
-                </table>
-            </div>
-
-            <div>
-                <div id="cuadro_estudiante" class="oculto box-derecha">
-                    <h3>Inscribir Nueva Materia</h3>
-                    
-                    <label>Mi Codigo Estudiantil:</label>
-                    <input type="text" id="ins_codigo" disabled style="background: #e9ecef; color: #555;">
-                    
-                    <label>Seleccionar Materia Disponible:</label>
-                    <select id="ins_materia" onchange="cargarGruposMateria()">
-                        <option value="">-- Seleccione una materia --</option>
-                        <optgroup label="Facultad de Sistemas">
-                            <option value="1">Algoritmia y programacion</option>
-                            <option value="2">Introduccion a la Teoria de la Computacion</option>
-                            <option value="3">Diseno y Programacion Orientados a Objetos</option>
-                            <option value="4">Estructuras de Datos</option>
-                        </optgroup>
-                        <optgroup label="Facultad de Ciencias Basicas">
-                            <option value="5">Fundamentacion matematica</option>
-                            <option value="6">Calculo diferencial</option>
-                            <option value="7">Fisica I</option>
-                            <option value="8">Fisica II</option>
-                        </optgroup>
-                    </select>
-
-                    <label>Seleccionar Horario / Grupo:</label>
-                    <select id="ins_grupo">
-                        <option value="">Seleccione una materia primero...</option>
-                    </select>
-                    
-                    <button onclick="inscribirMateria()" style="width: 100%; background: #28a745; font-size: 14px;">
-                        Matricular
-                    </button>
-                    <div id="msg_estudiante" style="margin-top: 10px; font-weight: bold; font-size: 13px; text-align: center;"></div>
-                </div>
-
-                <div id="cuadro_profesor" class="oculto box-derecha">
-                    <h3>Solicitar Cambio de Salon</h3>
-                    
-                    <label>Mis Materias Vigentes a Cargo:</label>
-                    <select id="sel_grupo_prof" onchange="cargarSalonesDisponibles()">
-                    </select>
-                    
-                    <label>Seleccionar Nuevo Salon Disponible:</label>
-                    <select id="sel_salon_prof">
-                        <option value="">Cargando salones...</option>
-                    </select>
-                    
-                    <button onclick="solicitarCambioSalon()" style="width: 100%; font-size: 14px;">
-                        Validar e Insertar Salon
-                    </button>
-                    
-                    <div id="msg_prof" style="margin-top: 15px; font-weight: bold; font-size: 13px; text-align: center;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
+<!-- ── CONTENIDO PRINCIPAL ── -->
+<div class="contenido" id="contenido">
+    <div class="cargando">Cargando información...</div>
 </div>
 
 <script>
-    const API = "http://127.0.0.1:8000";
-    const rol = localStorage.getItem("userRole");
-    const codigo = localStorage.getItem("userName");
-    
-    let imagenesCarrusel = [];
-    let imgIndex = 0;
+    const TOKEN  = "{{ token }}";
+    const ROL    = "{{ rol }}";
+    const CODIGO = "{{ codigo }}";
+    const API    = window.location.origin;
 
-    function rotarImagen() {
-        if (imagenesCarrusel.length > 0) {
-            document.getElementById("img_lateral").src = imagenesCarrusel[imgIndex];
-            imgIndex = (imgIndex + 1) % imagenesCarrusel.length;
-        }
-    }
-
+    // ── Inicialización ──
     document.addEventListener("DOMContentLoaded", () => {
-        if (!codigo || !rol) { window.location.href = "/login"; return; }
-        
-        fetch(`${API}/front/config`)
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById("msg_1").innerText = data.mensaje_1;
-            document.getElementById("msg_2").innerText = data.mensaje_2;
-            document.getElementById("msg_3").innerText = data.mensaje_3;
-            document.getElementById("msg_4").innerText = data.mensaje_4;
-            
-            // Activar Carrusel
-            imagenesCarrusel = [data.url_img_1, data.url_img_2, data.url_img_3].filter(img => img.trim() !== "");
-            rotarImagen();
-            setInterval(rotarImagen, 4000); 
-
-            if (rol === "Administrador") {
-                document.getElementById("inp_m1").value = data.mensaje_1;
-                document.getElementById("inp_m2").value = data.mensaje_2;
-                document.getElementById("inp_m3").value = data.mensaje_3;
-                document.getElementById("inp_m4").value = data.mensaje_4;
-                document.getElementById("inp_img1").value = data.url_img_1;
-                document.getElementById("inp_img2").value = data.url_img_2;
-                document.getElementById("inp_img3").value = data.url_img_3;
-            }
-        }).catch(err => console.warn("Modo contingencia local activado."));
-
-        document.getElementById("txt_rol").innerText = `Panel Institucional: ${rol} — Codigo: ${codigo}`;
-
-        if (rol === "Administrador") {
-            document.getElementById("vista_admin").classList.remove("oculto");
-        } else {
-            document.getElementById("vista_horario").classList.remove("oculto");
-            
-            if (rol === "Profesor") {
-                document.getElementById("cuadro_profesor").classList.remove("oculto");
-            } else if (rol === "Estudiante") {
-                document.getElementById("cuadro_estudiante").classList.remove("oculto");
-                document.getElementById("ins_codigo").value = codigo;
-            }
-            renderizarHorarioDB();
-        }
+        configurarNav();
+        mostrarSeccion("horario");
     });
 
-    function renderizarHorarioDB() {
-        fetch(`${API}/horarios/${codigo}`)
-        .then(res => res.json())
-        .then(horarioData => {
-            const tabla = document.getElementById("tabla_clases");
-            const dias = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes"];
-            const selectProf = document.getElementById("sel_grupo_prof");
-            
-            let html = `<tr><th>Hora</th>${dias.map(d => `<th>${d}</th>`).join('')}</tr>`;
-            if (selectProf) selectProf.innerHTML = "";
-
-            let gruposAgregados = [];
-
-            for (let h = 7; h <= 22; h++) {
-                let bloque = `${h}:00`;
-                html += `<tr><td style="font-weight:bold; background:#f8f9fa;">${bloque}</td>`;
-                
-                dias.forEach(d => {
-                    let celda = (horarioData[bloque] && horarioData[bloque][d]) ? horarioData[bloque][d] : null;
-                    if (celda) {
-                        let hoverInfo = `Grupo: ${celda.num_grupo} | ${celda.info_extra}`;
-                        html += `<td>
-                                    <div class="materia" title="${hoverInfo}">
-                                        ${celda.materia}
-                                        <span>📍 Salón: ${celda.salon}</span>
-                                    </div>
-                                 </td>`;
-                        
-                        if (rol === "Profesor" && celda.id_grupo && !gruposAgregados.includes(celda.id_grupo)) {
-                            gruposAgregados.push(celda.id_grupo);
-                            selectProf.innerHTML += `<option value="${celda.id_grupo}">${celda.materia} (Ref: G-${celda.num_grupo})</option>`;
-                        }
-                    } else {
-                        html += `<td><div class="vacio"></div></td>`;
-                    }
-                });
-                html += `</tr>`;
-            }
-            tabla.innerHTML = html;
-            
-            if (rol === "Profesor" && gruposAgregados.length > 0) {
-                cargarSalonesDisponibles();
-            }
-        });
-    }
-
-    function cargarGruposMateria() {
-        const idMateria = document.getElementById("ins_materia").value;
-        const selectGrupo = document.getElementById("ins_grupo");
-        if (!idMateria) {
-            selectGrupo.innerHTML = '<option value="">Seleccione una materia primero...</option>';
-            return;
+    function configurarNav() {
+        const nav = document.getElementById("nav-menu");
+        if (ROL === "Estudiante") {
+            nav.innerHTML += `<button onclick="mostrarSeccion('inscribir')">📝 Inscribir Materia</button>`;
+        } else if (ROL === "Profesor") {
+            nav.innerHTML += `<button onclick="mostrarSeccion('salones')">🏫 Cambiar Salón</button>`;
+        } else if (ROL === "Administrador") {
+            nav.innerHTML += `<button onclick="mostrarSeccion('optimizar')">🤖 Optimizar Horarios</button>`;
+            nav.innerHTML += `<button onclick="mostrarSeccion('config')">⚙️ Configurar Página</button>`;
         }
-
-        selectGrupo.innerHTML = '<option value="">Buscando horarios...</option>';
-
-        fetch(`${API}/materias/${idMateria}/grupos`)
-        .then(res => res.json())
-        .then(grupos => {
-            selectGrupo.innerHTML = "";
-            if (grupos.length === 0) {
-                selectGrupo.innerHTML = '<option value="">N/A (El sistema creará un grupo automático)</option>';
-            } else {
-                grupos.forEach(g => {
-                    let cuposDisponibles = g.limite - g.inscritos;
-                    selectGrupo.innerHTML += `<option value="${g.id_grupo}">Grupo ${g.num_grupo} | ${g.dia} - ${g.hora} (${cuposDisponibles} Cupos Restantes)</option>`;
-                });
-            }
-        });
     }
 
-    function cargarSalonesDisponibles() {
-        const idGrupo = document.getElementById("sel_grupo_prof").value;
-        if (!idGrupo) return;
+    // ── Navegación ──
+    function mostrarSeccion(seccion) {
+        document.querySelectorAll(".sidebar nav button").forEach(b => b.classList.remove("activo"));
+        event && event.target && event.target.classList && event.target.classList.add("activo");
 
-        fetch(`${API}/profesor/salones-disponibles/${idGrupo}`)
-        .then(res => res.json())
-        .then(salones => {
-            const selectSalon = document.getElementById("sel_salon_prof");
-            selectSalon.innerHTML = "";
-            
-            if(salones.length === 0) {
-                selectSalon.innerHTML = '<option value="">No hay salones desocupados en este horario</option>';
+        const c = document.getElementById("contenido");
+        c.innerHTML = `<div class="cargando">⏳ Cargando...</div>`;
+
+        const secciones = {
+            horario:   renderHorario,
+            inscribir: renderInscribir,
+            salones:   renderSalones,
+            optimizar: renderOptimizar,
+            config:    renderConfig
+        };
+        if (secciones[seccion]) secciones[seccion]();
+    }
+
+    // ── Manejo de errores de API ──
+    async function apiGet(url) {
+        const r = await fetch(`${API}${url}?token=${TOKEN}`);
+        if (!r.ok) { const d = await r.json(); throw new Error(d.detail || "Error del servidor."); }
+        return r.json();
+    }
+
+    async function apiPost(url, body) {
+        const r = await fetch(`${API}${url}?token=${TOKEN}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Error del servidor.");
+        return d;
+    }
+
+    async function apiPut(url) {
+        const r = await fetch(`${API}${url}&token=${TOKEN}`, { method: "PUT" });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "Error del servidor.");
+        return d;
+    }
+
+    // ────────────────────────────────────────────
+    // SECCIÓN: HORARIO
+    // ────────────────────────────────────────────
+    async function renderHorario() {
+        const c = document.getElementById("contenido");
+        try {
+            const horario = await apiGet("/horarios");
+            const horas   = Object.keys(horario).sort();
+            const dias    = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+
+            if (horas.length === 0) {
+                c.innerHTML = `
+                <div class="panel">
+                    <h3>📅 Mi Horario</h3>
+                    <p style="color:#888; text-align:center; padding:20px;">
+                        No tienes clases asignadas actualmente.
+                    </p>
+                </div>`;
                 return;
             }
-            
-            salones.forEach(s => {
-                selectSalon.innerHTML += `<option value="${s.id}">${s.nombre} (Capacidad: ${s.capacidad})</option>`;
+
+            let filas = horas.map(hora => {
+                let celdas = dias.map(dia => {
+                    const cl = horario[hora] && horario[hora][dia];
+                    if (cl) {
+                        return `<td class="ocupado">
+                            <strong>${cl.materia}</strong>
+                            <small>${cl.salon}</small><br>
+                            <small>${cl.info_extra}</small>
+                        </td>`;
+                    }
+                    return `<td class="vacio">—</td>`;
+                }).join("");
+                return `<tr><td><strong>${hora}</strong></td>${celdas}</tr>`;
+            }).join("");
+
+            c.innerHTML = `
+            <div class="panel">
+                <h3>📅 Mi Horario</h3>
+                <div style="overflow-x:auto;">
+                <table class="tabla-horario">
+                    <thead><tr>
+                        <th>Hora</th>
+                        ${dias.map(d => `<th>${d}</th>`).join("")}
+                    </tr></thead>
+                    <tbody>${filas}</tbody>
+                </table>
+                </div>
+            </div>`;
+        } catch (e) {
+            c.innerHTML = `<div class="panel"><div class="msg-error" style="display:block;">⚠️ ${e.message}</div></div>`;
+        }
+    }
+
+    // ────────────────────────────────────────────
+    // SECCIÓN: INSCRIBIR (Estudiante)
+    // ────────────────────────────────────────────
+    async function renderInscribir() {
+        const c = document.getElementById("contenido");
+        c.innerHTML = `
+        <div class="panel">
+            <h3>📝 Inscribir Materia</h3>
+            <div id="err-ins" class="msg-error"></div>
+            <div id="ok-ins" class="msg-exito"></div>
+            <label style="font-size:13px; color:#555;">ID de la materia:</label><br>
+            <input type="number" id="id-mat" placeholder="Ej: 1" min="1" style="width:180px;">
+            <button class="btn-accion" onclick="buscarGrupos()">Buscar Grupos</button>
+            <div id="grupos-cont" style="margin-top:16px;"></div>
+        </div>`;
+    }
+
+    async function buscarGrupos() {
+        const idMat = parseInt(document.getElementById("id-mat").value);
+        const cont  = document.getElementById("grupos-cont");
+        const errEl = document.getElementById("err-ins");
+        errEl.style.display = "none";
+
+        if (!idMat || idMat < 1) {
+            errEl.innerHTML = "⚠️ Ingrese un ID de materia válido.";
+            errEl.style.display = "block"; return;
+        }
+
+        cont.innerHTML = `<div class="cargando">Buscando grupos...</div>`;
+        try {
+            const grupos = await apiGet(`/materias/${idMat}/grupos`);
+            if (!grupos.length) {
+                cont.innerHTML = `<p style="color:#888;">No hay grupos disponibles. Se creará uno al inscribirse.</p>`;
+            } else {
+                const filas = grupos.map(g => `
+                <tr>
+                    <td>Grupo ${g.num_grupo}</td>
+                    <td>${g.dia || "—"}</td>
+                    <td>${g.hora || "—"}</td>
+                    <td>
+                        <span class="badge ${g.inscritos < g.limite ? "verde" : "rojo"}">
+                            ${g.inscritos}/${g.limite}
+                        </span>
+                    </td>
+                    <td><button class="btn-accion verde" onclick="inscribirse(${idMat}, ${g.id_grupo})">Elegir</button></td>
+                </tr>`).join("");
+                cont.innerHTML = `
+                <table class="tabla-grupos">
+                    <thead><tr><th>Grupo</th><th>Día</th><th>Hora</th><th>Cupo</th><th>Acción</th></tr></thead>
+                    <tbody>${filas}</tbody>
+                </table>
+                <button class="btn-accion" style="margin-top:12px;" onclick="inscribirse(${idMat}, null)">
+                    Asignar automáticamente
+                </button>`;
+            }
+        } catch(e) {
+            cont.innerHTML = "";
+            errEl.innerHTML = "⚠️ " + e.message;
+            errEl.style.display = "block";
+        }
+    }
+
+    async function inscribirse(idMat, idGrupo) {
+        const errEl = document.getElementById("err-ins");
+        const okEl  = document.getElementById("ok-ins");
+        errEl.style.display = "none";
+        okEl.style.display  = "none";
+        try {
+            const r = await apiPost("/inscribir", { id_materia: idMat, id_grupo: idGrupo });
+            okEl.innerHTML     = "✅ " + r.mensaje;
+            okEl.style.display = "block";
+            document.getElementById("grupos-cont").innerHTML = "";
+        } catch(e) {
+            errEl.innerHTML     = "⚠️ " + e.message;
+            errEl.style.display = "block";
+        }
+    }
+
+    // ────────────────────────────────────────────
+    // SECCIÓN: CAMBIAR SALÓN (Profesor)
+    // ────────────────────────────────────────────
+    async function renderSalones() {
+        const c = document.getElementById("contenido");
+        c.innerHTML = `
+        <div class="panel">
+            <h3>🏫 Cambiar Salón de un Grupo</h3>
+            <div id="err-sal" class="msg-error"></div>
+            <div id="ok-sal"  class="msg-exito"></div>
+            <label style="font-size:13px; color:#555;">ID del grupo:</label><br>
+            <input type="number" id="id-grp" placeholder="Ej: 1" min="1" style="width:180px;">
+            <button class="btn-accion" onclick="buscarSalones()">Ver Salones Disponibles</button>
+            <div id="salones-cont" style="margin-top:16px;"></div>
+        </div>`;
+    }
+
+    async function buscarSalones() {
+        const idGrp = parseInt(document.getElementById("id-grp").value);
+        const cont  = document.getElementById("salones-cont");
+        const errEl = document.getElementById("err-sal");
+        errEl.style.display = "none";
+
+        if (!idGrp || idGrp < 1) {
+            errEl.innerHTML = "⚠️ Ingrese un ID de grupo válido.";
+            errEl.style.display = "block"; return;
+        }
+
+        cont.innerHTML = `<div class="cargando">Buscando salones...</div>`;
+        try {
+            const salones = await apiGet(`/profesor/salones-disponibles/${idGrp}`);
+            if (!salones.length) {
+                cont.innerHTML = `<p style="color:#888;">No hay salones disponibles para este horario.</p>`;
+                return;
+            }
+            const filas = salones.map(s => `
+            <tr>
+                <td>${s.nombre}</td>
+                <td>${s.capacidad} personas</td>
+                <td><button class="btn-accion verde" onclick="cambiarSalon(${idGrp}, ${s.id})">Seleccionar</button></td>
+            </tr>`).join("");
+            cont.innerHTML = `
+            <table class="tabla-grupos">
+                <thead><tr><th>Salón</th><th>Capacidad</th><th>Acción</th></tr></thead>
+                <tbody>${filas}</tbody>
+            </table>`;
+        } catch(e) {
+            cont.innerHTML = "";
+            errEl.innerHTML = "⚠️ " + e.message;
+            errEl.style.display = "block";
+        }
+    }
+
+    async function cambiarSalon(idGrp, idSalon) {
+        const errEl = document.getElementById("err-sal");
+        const okEl  = document.getElementById("ok-sal");
+        errEl.style.display = "none";
+        okEl.style.display  = "none";
+        try {
+            const r = await apiPut(`/profesor/cambiar-salon?id_grupo=${idGrp}&id_nuevo_salon=${idSalon}`);
+            okEl.innerHTML     = "✅ " + r.mensaje;
+            okEl.style.display = "block";
+            document.getElementById("salones-cont").innerHTML = "";
+        } catch(e) {
+            errEl.innerHTML     = "⚠️ " + e.message;
+            errEl.style.display = "block";
+        }
+    }
+
+    // ────────────────────────────────────────────
+    // SECCIÓN: OPTIMIZAR (Admin)
+    // ────────────────────────────────────────────
+    async function renderOptimizar() {
+        const c = document.getElementById("contenido");
+        c.innerHTML = `
+        <div class="panel">
+            <h3>🤖 Optimización Genética de Horarios</h3>
+            <p style="color:#555; font-size:13px; margin-bottom:16px;">
+                Ejecuta el algoritmo genético para reasignar salones minimizando cruces y respetando capacidades.
+                Este proceso puede tardar unos segundos.
+            </p>
+            <div id="err-opt" class="msg-error"></div>
+            <div id="ok-opt"  class="msg-exito"></div>
+            <button class="btn-accion verde" id="btn-opt" onclick="ejecutarOptimizacion()">
+                ▶ Ejecutar Optimización
+            </button>
+        </div>`;
+    }
+
+    async function ejecutarOptimizacion() {
+        const errEl = document.getElementById("err-opt");
+        const okEl  = document.getElementById("ok-opt");
+        const btn   = document.getElementById("btn-opt");
+        errEl.style.display = "none";
+        okEl.style.display  = "none";
+        btn.disabled    = true;
+        btn.innerText   = "⏳ Procesando...";
+
+        try {
+            const r = await apiPost("/admin/optimizar-horarios", {});
+            okEl.innerHTML     = "✅ " + (r.mensaje || JSON.stringify(r));
+            okEl.style.display = "block";
+        } catch(e) {
+            errEl.innerHTML     = "⚠️ " + e.message;
+            errEl.style.display = "block";
+        } finally {
+            btn.disabled  = false;
+            btn.innerText = "▶ Ejecutar Optimización";
+        }
+    }
+
+    // ────────────────────────────────────────────
+    // SECCIÓN: CONFIG (Admin)
+    // ────────────────────────────────────────────
+    async function renderConfig() {
+        const c = document.getElementById("contenido");
+        c.innerHTML = `<div class="cargando">Cargando configuración...</div>`;
+        try {
+            const d = await fetch(`${API}/front/config`).then(r => r.json());
+            c.innerHTML = `
+            <div class="panel">
+                <h3>⚙️ Configurar Página de Login</h3>
+                <div id="err-cfg" class="msg-error"></div>
+                <div id="ok-cfg"  class="msg-exito"></div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+                    <div>
+                        <label style="font-size:12px; color:#555;">Mensaje 1</label><br>
+                        <input id="m1" type="text" value="${d.mensaje_1}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; color:#555;">Mensaje 2</label><br>
+                        <input id="m2" type="text" value="${d.mensaje_2}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; color:#555;">Mensaje 3</label><br>
+                        <input id="m3" type="text" value="${d.mensaje_3}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; color:#555;">Mensaje 4</label><br>
+                        <input id="m4" type="text" value="${d.mensaje_4}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; color:#555;">URL Imagen 1</label><br>
+                        <input id="i1" type="text" value="${d.url_img_1}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; color:#555;">URL Imagen 2</label><br>
+                        <input id="i2" type="text" value="${d.url_img_2}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; color:#555;">URL Imagen 3</label><br>
+                        <input id="i3" type="text" value="${d.url_img_3}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
+                    </div>
+                </div>
+                <button class="btn-accion verde" onclick="guardarConfig()">💾 Guardar Cambios</button>
+            </div>`;
+        } catch(e) {
+            c.innerHTML = `<div class="panel"><div class="msg-error" style="display:block;">⚠️ ${e.message}</div></div>`;
+        }
+    }
+
+    async function guardarConfig() {
+        const errEl = document.getElementById("err-cfg");
+        const okEl  = document.getElementById("ok-cfg");
+        errEl.style.display = "none";
+        okEl.style.display  = "none";
+        try {
+            const r = await fetch(`${API}/front/config`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    codigo_admin: CODIGO,
+                    msg_1: document.getElementById("m1").value,
+                    msg_2: document.getElementById("m2").value,
+                    msg_3: document.getElementById("m3").value,
+                    msg_4: document.getElementById("m4").value,
+                    img_1: document.getElementById("i1").value,
+                    img_2: document.getElementById("i2").value,
+                    img_3: document.getElementById("i3").value
+                })
             });
-        });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.detail);
+            okEl.innerHTML     = "✅ " + d.mensaje;
+            okEl.style.display = "block";
+        } catch(e) {
+            errEl.innerHTML     = "⚠️ " + e.message;
+            errEl.style.display = "block";
+        }
     }
 
-    function guardarConfiguracionAdmin() {
-        const payload = {
-            codigo_admin: codigo,
-            msg_1: document.getElementById("inp_m1").value,
-            msg_2: document.getElementById("inp_m2").value,
-            msg_3: document.getElementById("inp_m3").value,
-            msg_4: document.getElementById("inp_m4").value,
-            img_1: document.getElementById("inp_img1").value,
-            img_2: document.getElementById("inp_img2").value,
-            img_3: document.getElementById("inp_img3").value
-        };
-
-        fetch(`${API}/front/config`, { 
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        })
-        .then(async res => {
-            let data = await res.json();
-            if (!res.ok) alert("Error: " + data.detail);
-            else {
-                alert("Base de datos de interfaz actualizada globalmente con exito.");
-                location.reload();
-            }
-        });
-    }
-
-    function inscribirMateria() {
-        const idMateria = document.getElementById("ins_materia").value;
-        const idGrupo = document.getElementById("ins_grupo").value;
-        const msgDiv = document.getElementById("msg_estudiante");
-        
-        if (!idMateria) { alert("Seleccione una materia"); return; }
-        
-        let payload = { codigo_usuario: codigo, id_materia: parseInt(idMateria) };
-        if (idGrupo) payload.id_grupo = parseInt(idGrupo);
-
-        fetch(`${API}/inscribir`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        })
-        .then(async res => {
-            let data = await res.json();
-            if (!res.ok) {
-                msgDiv.style.color = "red";
-                msgDiv.innerText = "❌ " + (data.detail || "Error desconocido");
-            } else {
-                msgDiv.style.color = "green";
-                msgDiv.innerText = "✅ " + data.mensaje;
-                renderizarHorarioDB();
-                cargarGruposMateria(); 
-            }
-        }).catch(err => console.error(err));
-    }
-
-    function solicitarCambioSalon() {
-        const idGrupo = document.getElementById("sel_grupo_prof").value;
-        const idSalon = document.getElementById("sel_salon_prof").value;
-        const msgDiv = document.getElementById("msg_prof");
-        
-        if (!idGrupo) { alert("Usted no posee materias a cargo en este periodo academico."); return; }
-        if (!idSalon) { alert("Debe seleccionar un salon valido."); return; }
-
-        msgDiv.innerText = "Procesando...";
-        msgDiv.style.color = "#333";
-
-        fetch(`${API}/profesor/cambiar-salon?codigo_profesor=${codigo}&id_grupo=${idGrupo}&id_nuevo_salon=${idSalon}`, { 
-            method: "PUT" 
-        })
-        .then(async res => {
-            let data = await res.json();
-            if (!res.ok) {
-                msgDiv.style.color = "red";
-                msgDiv.innerText = "❌ Error: " + data.detail;
-            } else {
-                msgDiv.style.color = "green";
-                msgDiv.innerText = "✅ Éxito: " + data.mensaje;
-                renderizarHorarioDB();
-                cargarSalonesDisponibles(); 
-            }
-        });
-    }
-
-    function ejecutarLogout() { 
-        localStorage.clear(); 
-        window.location.href = "/login"; 
+    // ── Cerrar sesión ──
+    async function cerrarSesion() {
+        try {
+            await fetch(`${API}/logout?token=${TOKEN}`, { method: "POST" });
+        } catch(e) {}
+        window.location.href = "/login";
     }
 </script>
 </body>
