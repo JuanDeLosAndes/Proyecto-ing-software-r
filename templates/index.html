@@ -1,32 +1,117 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Inicio</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
-</head>
+{#
+  PATRÓN: Template Method — index.html rellena los bloques de base.html.
+  OCP: extiende sin modificar base.html.
 
-<body>
+  Jinja2 features demostradas:
+    - {% extends %}     → herencia de plantillas
+    - {% block %}       → sobreescritura de bloques
+    - {% if config %}   → condicional con estado vacío
+    - {% for srv in %}  → bucle sobre lista de servicios (pasada desde FastAPI)
+    - {{ var | filtro}} → filtros: default(), upper
+    - url_for()         → generación de URLs estáticas
+#}
+{% extends "base.html" %}
 
-<div class="top">
-    <h2>Universidad Católica de Colombia</h2>
-    <h3>Asignación de Salones</h3>
-</div>
+{% block titulo %}Inicio{% endblock %}
 
-<div class="menu">
-    <a href="/login" class="btn">ASIGNACIÓN DE SALÓN</a>
+{% block contenido %}
 
-    <a href="https://login.microsoftonline.com" class="btn">CORREO</a>
+{# ── ZONA 1 DEL PATRÓN F: Hero (primera línea horizontal de barrido) ── #}
+<section class="hero-idx" aria-labelledby="hero-titulo">
+  <div class="hero-inner">
+    <span class="hero-tag">🎓 Universidad Católica de Colombia</span>
 
-    <a href="https://newava.ucatolica.edu.co/ava2/login/index.php" class="btn">
-        CAMPUS EN LÍNEA - AVA
-    </a>
+    <h1 id="hero-titulo">
+      Asignación<br>
+      <span>Inteligente</span> de Salones
+    </h1>
 
-    <a href="https://portalweb.ucatolica.edu.co/paw/" class="btn">PAW 2.0</a>
-</div>
+    {#
+      Jinja2 — Condicional con estado vacío:
+      Si FastAPI pasa un objeto config, mostramos el mensaje dinámico.
+      Si no, mostramos el texto por defecto.
+    #}
+    {% if config %}
+      <p>{{ config.mensaje_1 | default('Sistema institucional de gestión de espacios físicos.') }}</p>
+    {% else %}
+      <p>
+        Plataforma institucional para la gestión inteligente de espacios físicos
+        mediante algoritmos genéticos. Accede con tu código institucional.
+      </p>
+    {% endif %}
 
-<div class="imagen-inferior">
-    <img src="{{ url_for('static', path='img/fondo.png') }}" alt="Imagen institucional">
-</div>
+    <div class="hero-btns">
+      <a href="/login" class="btn-p">🔐 Ingresar al Sistema</a>
+      <a href="https://www.ucatolica.edu.co" target="_blank" class="btn-s" style="color:#a8c5e8; border-color:#4f79a6;">
+        Sitio Institucional →
+      </a>
+    </div>
+  </div>
+</section>
 
-</body>
-</html>
+{# ── ZONA 2 DEL PATRÓN F: Segunda línea + descenso vertical (cards) ── #}
+<section class="sec-srv" aria-labelledby="srv-titulo">
+  <div class="sec-hdr">
+    <h2 id="srv-titulo">Servicios Universitarios</h2>
+
+    {# Jinja2 — Condicional: subtítulo dinámico si hay config #}
+    {% if config and config.mensaje_2 %}
+      <p>{{ config.mensaje_2 }}</p>
+    {% else %}
+      <p>Accede a los portales y herramientas de la comunidad académica.</p>
+    {% endif %}
+  </div>
+
+  {#
+    Jinja2 — Bucle sobre lista de servicios pasada desde FastAPI.
+    Single Responsibility: la vista solo renderiza, no calcula.
+    Dependency Inversion: depende del contexto abstracto, no de datos hardcodeados.
+  #}
+  {% if servicios %}
+    <div class="grid-srv" role="list">
+      {% for srv in servicios %}
+      <a href="{{ srv.url }}"
+         class="card-srv"
+         role="listitem"
+         {% if srv.externo %}target="_blank" rel="noopener"{% endif %}
+         aria-label="{{ srv.titulo }}">
+        <span class="srv-ico" aria-hidden="true">{{ srv.icono }}</span>
+        <h3 class="srv-tit">{{ srv.titulo }}</h3>
+        <p class="srv-desc">{{ srv.desc }}</p>
+        <span class="srv-arrow">
+          {% if srv.externo %}Ir al sitio →{% else %}Acceder →{% endif %}
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+
+  {% else %}
+    {# Jinja2 — Manejo de estado vacío #}
+    <div class="estado-vacio" role="status">
+      <span aria-hidden="true">🏫</span>
+      No hay servicios configurados actualmente.<br>
+      <small>El administrador puede actualizar esta información desde el panel.</small>
+    </div>
+  {% endif %}
+
+</section>
+
+{# Sección informativa extra — usa mensaje_3 y mensaje_4 de config #}
+{% if config and config.mensaje_3 %}
+<section style="background: var(--c-azfon); padding: 32px 24px;">
+  <div style="max-width:1280px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+    <div class="card" style="border-left:4px solid var(--c-ama);">
+      <h3 style="color:var(--c-osc); margin-bottom:8px; font-size:15px;">📢 Aviso Institucional</h3>
+      <p style="font-size:13px; color:var(--c-txtm); line-height:1.7;">{{ config.mensaje_3 }}</p>
+    </div>
+    {% if config.mensaje_4 %}
+    <div class="card" style="border-left:4px solid var(--c-med);">
+      <h3 style="color:var(--c-osc); margin-bottom:8px; font-size:15px;">🔔 Información</h3>
+      <p style="font-size:13px; color:var(--c-txtm); line-height:1.7;">{{ config.mensaje_4 }}</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

@@ -1,211 +1,281 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Login Institucional</title>
-    <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: Arial, sans-serif; display: flex; height: 100vh; }
-        .left { width: 30%; background: #0d1b4c; display: flex; flex-direction: column; }
-        .panel {
-            flex: 1; display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            color: white; text-align: center; padding: 30px; margin: 10px;
-            border: 2px solid #4f79a6; border-radius: 10px; font-size: 14px;
-        }
-        .panel-img { position: relative; overflow: hidden; }
-        .panel-img img { position: absolute; width: 100%; height: 100%; object-fit: cover; opacity: 0.3; top:0; left:0; }
-        .panel-img .texto { position: relative; z-index: 2; }
-        .linea { height: 2px; background: yellow; }
-        hr { border: none; border-top: 1px solid #4f79a6; width: 80%; opacity: 0.6; margin: 10px auto; }
-        .right { width: 70%; background: #f2f2f2; display: flex; justify-content: center; align-items: center; }
-        .box { text-align: center; width: 320px; }
-        .icon {
-            width: 100px; height: 100px; background: #1c2f4a; border-radius: 50%;
-            margin: auto auto 20px; display: flex; justify-content: center;
-            align-items: center; color: orange; font-size: 36px;
-        }
-        .campo {
-            display: block; margin: 10px auto; padding: 12px 16px; width: 100%;
-            border-radius: 25px; border: 2px solid transparent;
-            background: #4f79a6; color: white; text-align: center;
-            font-size: 14px; outline: none; transition: border 0.2s;
-        }
-        .campo::placeholder { color: rgba(255,255,255,0.75); }
-        .campo.error { border-color: #ff6b6b; background: #8b2e2e; }
-        .campo:focus { border-color: #a8c5e8; }
-        .btn-login {
-            margin-top: 14px; padding: 12px 36px; background: #4f79a6;
-            color: white; border: none; border-radius: 25px;
-            cursor: pointer; font-weight: bold; font-size: 14px;
-            width: 100%; transition: background 0.2s;
-        }
-        .btn-login:hover { background: #35597c; }
-        .btn-login:disabled { background: #888; cursor: not-allowed; }
-        #msg-error {
-            background: #ffe0e0; color: #c0392b; border: 1px solid #f5c6cb;
-            border-radius: 10px; padding: 10px 14px; margin-top: 12px;
-            font-size: 13px; display: none; text-align: left;
-        }
-        #msg-exito {
-            background: #d4edda; color: #155724; border: 1px solid #c3e6cb;
-            border-radius: 10px; padding: 10px 14px; margin-top: 12px;
-            font-size: 13px; display: none;
-        }
-    </style>
-</head>
-<body>
+{#
+  PATRÓN: Template Method — login.html rellena los bloques de base.html.
+  SRP: esta plantilla SOLO gestiona la vista de autenticación.
+  OCP: extiende base.html sin modificarlo.
 
-<div class="left">
-    <div class="panel">
-        <h3 id="msg_1" style="margin-top:0;">Cargando...</h3>
-        <hr>
-        <p id="msg_2">Sincronizando información institucional.</p>
+  Patrón F aplicado:
+    - Formulario a la IZQUIERDA → zona de mayor fijación visual.
+    - Carrusel + info institucional a la DERECHA → complemento visual.
+    - En móvil: carrusel arriba (identidad UCC), formulario abajo (acción).
+
+  Colorimetría corregida:
+    - Inputs: fondo BLANCO, texto OSCURO, borde sutil.
+    - Botón CTA: AMARILLO (guía el ojo al punto de acción).
+    - Panel izquierdo: BLANCO LIMPIO (legibilidad máxima).
+#}
+{% extends "base.html" %}
+
+{% block titulo %}Iniciar Sesión{% endblock %}
+{% set body_class = 'pagina-login' %}
+
+{% block contenido %}
+<div class="login-wrap" role="main" aria-label="Pantalla de acceso institucional">
+
+  {# ══════════════════════════════════════════════════
+     COLUMNA IZQUIERDA — FORMULARIO PRINCIPAL
+     Patrón F: posición de MÁXIMA fijación visual.
+     En móvil: aparece debajo del carrusel.
+     ══════════════════════════════════════════════════ #}
+  <section class="login-izq" aria-labelledby="login-titulo">
+    <div class="login-box">
+
+      <div class="login-ico" aria-hidden="true">👥</div>
+      <h1 class="login-tit" id="login-titulo">Inicia Sesión</h1>
+      <p class="login-sub">Accede con tu código y contraseña institucional</p>
+
+      {# Alerta de error — visible solo cuando hay error (JS la activa) #}
+      <div id="alerta-err" class="alerta" role="alert" aria-live="assertive"></div>
+      <div id="alerta-ok"  class="alerta" role="status" aria-live="polite"></div>
+
+      {# ── Campo Código ──
+         Colorimetría: fondo blanco, texto oscuro, borde sutil.
+         Antes era: fondo #4f79a6 → imposible de leer, incumple WCAG. #}
+      <div class="campo-grp">
+        <label class="label" for="codigo">Código Institucional</label>
+        <input
+          type="text"
+          id="codigo"
+          class="campo"
+          placeholder="Ej: 67001234 (Estudiante)"
+          maxlength="10"
+          inputmode="numeric"
+          autocomplete="username"
+          aria-required="true"
+          aria-describedby="codigo-ayuda">
+        <small id="codigo-ayuda" style="font-size:11px; color:var(--c-txts); margin-top:4px; display:block;">
+          Estudiante: 8 dígitos · Profesor: 10 dígitos
+        </small>
+      </div>
+
+      <div class="campo-grp">
+        <label class="label" for="contrasena">Contraseña</label>
+        <input
+          type="password"
+          id="contrasena"
+          class="campo"
+          placeholder="Tu contraseña"
+          autocomplete="current-password"
+          aria-required="true">
+      </div>
+
+      {# Botón CTA — AMARILLO: guía la vista hacia la acción principal (Patrón F) #}
+      <button class="btn-p" id="btn-login" onclick="ejecutarLogin()">
+        🔐 INGRESAR
+      </button>
+
+      <div class="login-sep"></div>
+      <p class="login-footer-txt">
+        Sistema exclusivo para la comunidad universitaria.<br>
+        Para soporte: <a href="mailto:soporte@ucatolica.edu.co" style="color:var(--c-med);">soporte@ucatolica.edu.co</a>
+      </p>
+
     </div>
-    <div class="linea"></div>
-    <div class="panel panel-img">
-        <img id="imagen_global" src="" alt="">
-        <div class="texto">
-            <h3 id="msg_3" style="margin-top:0; color:#ffeb3b;">Cargando...</h3>
-            <hr>
-            <p id="msg_4">Conectando a base de datos segura.</p>
-        </div>
+  </section>
+
+  {# ══════════════════════════════════════════════════
+     COLUMNA DERECHA — CARRUSEL + INFO INSTITUCIONAL
+     En móvil: aparece ARRIBA (identificación visual UCC).
+     Imágenes configuradas por el admin en /front/config.
+     ══════════════════════════════════════════════════ #}
+  <aside class="login-der" aria-label="Información institucional y campus">
+
+    <div class="car-wrap">
+      <div class="car-pattern" aria-hidden="true"></div>
+      {# Las imágenes se inyectan por JS desde la API /front/config #}
+      <img id="car-img-0" class="car-img activa" src="" alt="Campus Universidad Católica de Colombia">
+      <img id="car-img-1" class="car-img"         src="" alt="Sede Las Torres UCC">
+      <img id="car-img-2" class="car-img"         src="" alt="Comunidad universitaria UCC">
+      <div class="car-ovl" aria-hidden="true"></div>
+      <div class="car-dots" id="car-dots" aria-label="Indicadores del carrusel"></div>
     </div>
+
+    {# Info institucional — visible en desktop, oculta en móvil #}
+    <div class="info-inst">
+      <div class="info-blq">
+        <h3 id="msg-1">Cargando...</h3>
+        <div class="info-hr"></div>
+        <p id="msg-2">Sincronizando información institucional.</p>
+      </div>
+      <div class="info-hr"></div>
+      <div class="info-blq">
+        <h3 id="msg-3" style="color:var(--c-ama);">Sistema Activo</h3>
+        <p id="msg-4">Conectando a base de datos segura.</p>
+      </div>
+    </div>
+
+  </aside>
+
+  {# Info condensada para móvil — debajo del formulario #}
+  <div class="info-movil" aria-label="Aviso institucional">
+    <p id="msg-movil">Universidad Católica de Colombia · Sistema de Asignación de Salones</p>
+  </div>
+
 </div>
+{% endblock %}
 
-<div class="right">
-    <div class="box">
-        <div class="icon">👥</div>
-        <input type="text"     id="codigo"     class="campo" placeholder="CÓDIGO INSTITUCIONAL" maxlength="10">
-        <input type="password" id="contrasena" class="campo" placeholder="CONTRASEÑA">
-        <div id="msg-error"></div>
-        <div id="msg-exito"></div>
-        <button class="btn-login" onclick="ejecutarLogin()" id="btn">INGRESAR</button>
-    </div>
-</div>
-
+{% block scripts %}
 <script>
-    const API = window.location.origin;
-    let imagenesCarrusel = [];
-    let imgIndex = 0;
+  /* SRP: este script SOLO maneja la lógica de login y carrusel. */
+  const API = window.location.origin;
 
-    // ── Cargar configuración del frontend ──
+  /* ── Carrusel ──
+     Patrón Strategy implícito: las imágenes se intercambian
+     sin modificar el algoritmo de rotación. */
+  const imgIds  = ['car-img-0', 'car-img-1', 'car-img-2'];
+  let   imgUrls = [];
+  let   carIdx  = 0;
+  let   carTimer = null;
+
+  function iniciarCarrusel(urls) {
+    imgUrls = urls.filter(u => u && u.trim());
+    if (!imgUrls.length) return;
+    imgUrls.forEach((url, i) => {
+      const el = document.getElementById(imgIds[i]);
+      if (el) el.src = url;
+    });
+    renderDots();
+    activarImg(0);
+    carTimer = setInterval(() => {
+      carIdx = (carIdx + 1) % imgUrls.length;
+      activarImg(carIdx);
+    }, 4500);
+  }
+
+  function activarImg(idx) {
+    imgIds.forEach((id, i) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('activa', i === idx);
+    });
+    document.querySelectorAll('.car-dot').forEach((d, i) => {
+      d.classList.toggle('activo', i === idx);
+    });
+  }
+
+  function renderDots() {
+    const c = document.getElementById('car-dots');
+    c.innerHTML = imgUrls.map((_, i) =>
+      `<button class="car-dot${i===0?' activo':''}" onclick="irImg(${i})" aria-label="Imagen ${i+1}"></button>`
+    ).join('');
+  }
+
+  window.irImg = function(idx) {
+    clearInterval(carTimer);
+    carIdx = idx;
+    activarImg(idx);
+    carTimer = setInterval(() => {
+      carIdx = (carIdx + 1) % imgUrls.length;
+      activarImg(carIdx);
+    }, 4500);
+  };
+
+  /* ── Cargar config institucional ── */
+  document.addEventListener('DOMContentLoaded', () => {
     fetch(`${API}/front/config`)
-        .then(r => r.json())
-        .then(d => {
-            document.getElementById("msg_1").innerText = d.mensaje_1;
-            document.getElementById("msg_2").innerText = d.mensaje_2;
-            document.getElementById("msg_3").innerText = d.mensaje_3;
-            document.getElementById("msg_4").innerText = d.mensaje_4;
-            imagenesCarrusel = [d.url_img_1, d.url_img_2, d.url_img_3].filter(u => u && u.trim());
-            rotarImagen();
-            setInterval(rotarImagen, 4000);
-        })
-        .catch(() => {});
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        setText('msg-1', d.mensaje_1);
+        setText('msg-2', d.mensaje_2);
+        setText('msg-3', d.mensaje_3);
+        setText('msg-4', d.mensaje_4);
+        setText('msg-movil', d.mensaje_1 || 'Universidad Católica de Colombia');
+        iniciarCarrusel([d.url_img_1, d.url_img_2, d.url_img_3]);
+      })
+      .catch(() => { /* usa textos por defecto del HTML */ });
+  });
 
-    function rotarImagen() {
-        if (imagenesCarrusel.length > 0) {
-            document.getElementById("imagen_global").src = imagenesCarrusel[imgIndex];
-            imgIndex = (imgIndex + 1) % imagenesCarrusel.length;
-        }
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el && val && val.trim()) el.innerText = val;
+  }
+
+  /* ── Validación cliente (DIP: depende de funciones abstractas) ── */
+  function validarCampos(codigo, clave) {
+    if (!codigo.trim()) return 'El código institucional es obligatorio.';
+    if (!/^\d+$/.test(codigo.trim())) return 'El código solo puede contener números, no letras ni símbolos.';
+    if (codigo.trim().length < 8)    return 'El código debe tener al menos 8 dígitos.';
+    if (!clave.trim())               return 'La contraseña es obligatoria.';
+    if (clave.trim().length < 4)     return 'La contraseña debe tener al menos 4 caracteres.';
+    return null;
+  }
+
+  function mostrarErr(msg) {
+    const e = document.getElementById('alerta-err');
+    e.className = 'alerta err';
+    e.innerHTML = '⚠️ ' + msg;
+    document.getElementById('alerta-ok').className = 'alerta';
+  }
+
+  function mostrarOk(msg) {
+    const e = document.getElementById('alerta-ok');
+    e.className = 'alerta ok';
+    e.innerHTML = '✅ ' + msg;
+    document.getElementById('alerta-err').className = 'alerta';
+  }
+
+  function limpiarAlertas() {
+    document.getElementById('alerta-err').className = 'alerta';
+    document.getElementById('alerta-ok').className  = 'alerta';
+    document.querySelectorAll('.campo').forEach(c => c.classList.remove('campo-err'));
+  }
+
+  /* Limpiar error al escribir */
+  ['codigo','contrasena'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', limpiarAlertas);
+  });
+
+  /* Enter para login */
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') ejecutarLogin(); });
+
+  /* ── Login (SRP: función con una sola responsabilidad) ── */
+  async function ejecutarLogin() {
+    const codigo = document.getElementById('codigo').value;
+    const clave  = document.getElementById('contrasena').value;
+    limpiarAlertas();
+
+    const err = validarCampos(codigo, clave);
+    if (err) {
+      if (!codigo.trim() || !/^\d+$/.test(codigo.trim()) || codigo.trim().length < 8)
+        document.getElementById('codigo').classList.add('campo-err');
+      else
+        document.getElementById('contrasena').classList.add('campo-err');
+      mostrarErr(err);
+      return;
     }
 
-    // ── Mostrar mensajes ──
-    function mostrarError(msg) {
-        const el = document.getElementById("msg-error");
-        el.innerHTML = "⚠️ " + msg;
-        el.style.display = "block";
-        document.getElementById("msg-exito").style.display = "none";
+    const btn = document.getElementById('btn-login');
+    btn.disabled  = true;
+    btn.innerHTML = '⏳ Verificando...';
+
+    try {
+      const res  = await fetch(`${API}/login`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ codigo: codigo.trim(), contrasena: clave.trim() })
+      });
+      const data = await res.json();
+
+      if (!res.ok) { mostrarErr(data.detail || 'Credenciales incorrectas.'); return; }
+
+      mostrarOk('Acceso concedido. Redirigiendo...');
+      setTimeout(() => { window.location.href = `/sesion/${data.token}`; }, 700);
+
+    } catch {
+      mostrarErr('No se pudo conectar con el servidor. Intente de nuevo.');
+    } finally {
+      btn.disabled  = false;
+      btn.innerHTML = '🔐 INGRESAR';
     }
-
-    function mostrarExito(msg) {
-        const el = document.getElementById("msg-exito");
-        el.innerHTML = "✅ " + msg;
-        el.style.display = "block";
-        document.getElementById("msg-error").style.display = "none";
-    }
-
-    function limpiarMensajes() {
-        document.getElementById("msg-error").style.display = "none";
-        document.getElementById("msg-exito").style.display = "none";
-        document.querySelectorAll(".campo").forEach(c => c.classList.remove("error"));
-    }
-
-    // ── Validación cliente ──
-    function validarCampos(codigo, contrasena) {
-        if (!codigo.trim()) {
-            document.getElementById("codigo").classList.add("error");
-            mostrarError("El código institucional es obligatorio.");
-            return false;
-        }
-        if (!/^\d+$/.test(codigo.trim())) {
-            document.getElementById("codigo").classList.add("error");
-            mostrarError("El código solo puede contener números, no letras ni símbolos.");
-            return false;
-        }
-        if (codigo.trim().length < 8) {
-            document.getElementById("codigo").classList.add("error");
-            mostrarError("El código debe tener al menos 8 dígitos.");
-            return false;
-        }
-        if (!contrasena.trim()) {
-            document.getElementById("contrasena").classList.add("error");
-            mostrarError("La contraseña es obligatoria.");
-            return false;
-        }
-        if (contrasena.trim().length < 4) {
-            document.getElementById("contrasena").classList.add("error");
-            mostrarError("La contraseña debe tener al menos 4 caracteres.");
-            return false;
-        }
-        return true;
-    }
-
-    // ── Limpiar error al escribir ──
-    document.getElementById("codigo").addEventListener("input", limpiarMensajes);
-    document.getElementById("contrasena").addEventListener("input", limpiarMensajes);
-
-    // ── Enter para iniciar sesión ──
-    document.addEventListener("keydown", e => { if (e.key === "Enter") ejecutarLogin(); });
-
-    // ── Login ──
-    async function ejecutarLogin() {
-        const codigo     = document.getElementById("codigo").value;
-        const contrasena = document.getElementById("contrasena").value;
-
-        limpiarMensajes();
-        if (!validarCampos(codigo, contrasena)) return;
-
-        const btn = document.getElementById("btn");
-        btn.disabled = true;
-        btn.innerText = "Verificando...";
-
-        try {
-            const res = await fetch(`${API}/login`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ codigo: codigo.trim(), contrasena: contrasena.trim() })
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                mostrarError(data.detail || "Error al iniciar sesión.");
-                return;
-            }
-
-            mostrarExito("Acceso concedido. Redirigiendo...");
-            setTimeout(() => {
-                window.location.href = `/sesion/${data.token}`;
-            }, 600);
-
-        } catch (e) {
-            mostrarError("No se pudo conectar con el servidor. Intente de nuevo.");
-        } finally {
-            btn.disabled = false;
-            btn.innerText = "INGRESAR";
-        }
-    }
+  }
 </script>
-</body>
-</html>
+{% endblock %}

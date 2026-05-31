@@ -1,509 +1,410 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Asignación de Salones</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, sans-serif; display: flex; height: 100vh; background: #f2f2f2; }
+{#
+  PATRÓN: Template Method — asignacion.html extiende base.html
+  pero reemplaza header y footer para lograr el layout de dashboard.
+  SRP: esta plantilla gestiona exclusivamente la vista del dashboard.
+  OCP: el comportamiento de cada rol se inyecta desde JavaScript
+       sin modificar el HTML base.
+#}
+{% extends "base.html" %}
 
-        /* ── SIDEBAR ── */
-        .sidebar {
-            width: 260px; min-width: 260px; background: #0d1b4c;
-            color: white; display: flex; flex-direction: column;
-            padding: 20px; gap: 12px;
-        }
-        .sidebar h2 { font-size: 15px; text-align: center; border-bottom: 1px solid #4f79a6; padding-bottom: 12px; }
-        .sidebar .info { background: #1c2f4a; border-radius: 8px; padding: 12px; font-size: 13px; }
-        .sidebar .info span { color: #a8c5e8; display: block; margin-bottom: 4px; }
-        .sidebar .info strong { font-size: 15px; }
-        .sidebar nav { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-        .sidebar nav button {
-            background: #4f79a6; color: white; border: none;
-            border-radius: 8px; padding: 10px; cursor: pointer;
-            font-size: 13px; text-align: left; transition: background 0.2s;
-        }
-        .sidebar nav button:hover, .sidebar nav button.activo { background: #35597c; }
-        .btn-logout {
-            margin-top: auto; background: #8b2e2e; color: white;
-            border: none; border-radius: 8px; padding: 10px;
-            cursor: pointer; font-size: 13px; transition: background 0.2s;
-        }
-        .btn-logout:hover { background: #a83232; }
+{% block titulo %}Dashboard — {{ rol | default('Usuario') }}{% endblock %}
 
-        /* ── CONTENIDO ── */
-        .contenido { flex: 1; overflow-y: auto; padding: 24px; }
-        .panel { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .panel h3 { color: #0d1b4c; margin-bottom: 16px; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px; }
+{# Para el dashboard no mostramos el header institucional:
+   la sidebar cumple esa función de navegación. #}
+{% block header %}{% endblock %}
+{% block footer %}{% endblock %}
 
-        /* ── HORARIO ── */
-        .tabla-horario { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .tabla-horario th { background: #0d1b4c; color: white; padding: 10px 8px; text-align: center; }
-        .tabla-horario td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: middle; min-width: 100px; }
-        .tabla-horario td.ocupado { background: #e8f0fe; }
-        .tabla-horario td.ocupado strong { display: block; color: #0d1b4c; }
-        .tabla-horario td.ocupado small { color: #555; font-size: 11px; }
-        .tabla-horario td.vacio { background: #fafafa; color: #bbb; }
+{% block contenido %}
 
-        /* ── MENSAJES ── */
-        .msg-error { background: #ffe0e0; color: #c0392b; border: 1px solid #f5c6cb; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: none; }
-        .msg-exito { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: none; }
+{# ── Botón hamburger: visible solo en móvil ── #}
+<button class="btn-ham" onclick="toggleSidebar()" aria-label="Abrir menú">☰</button>
+<div class="overlay-sb" id="overlay" onclick="toggleSidebar()"></div>
 
-        /* ── FORMULARIOS ── */
-        select, input[type="number"] {
-            padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc;
-            font-size: 13px; margin-right: 8px; margin-bottom: 8px;
-        }
-        .btn-accion {
-            background: #4f79a6; color: white; border: none;
-            border-radius: 8px; padding: 10px 20px;
-            cursor: pointer; font-size: 13px; transition: background 0.2s;
-        }
-        .btn-accion:hover { background: #35597c; }
-        .btn-accion.verde { background: #27ae60; }
-        .btn-accion.verde:hover { background: #1e8449; }
-        .btn-accion.rojo { background: #c0392b; }
-        .btn-accion.rojo:hover { background: #962d22; }
+<div class="app-wrap">
 
-        /* ── SPINNER ── */
-        .cargando { text-align: center; color: #888; padding: 30px; font-size: 14px; }
+  {# ══════════════════════════════════
+     SIDEBAR — Patrón F: columna izquierda
+     (zona vertical de descenso visual)
+     ══════════════════════════════════ #}
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Menú principal del sistema">
 
-        /* ── TABLA GRUPOS ── */
-        .tabla-grupos { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
-        .tabla-grupos th { background: #4f79a6; color: white; padding: 8px; text-align: left; }
-        .tabla-grupos td { border-bottom: 1px solid #eee; padding: 8px; }
-        .tabla-grupos tr:hover td { background: #f5f8ff; }
-        .badge {
-            display: inline-block; padding: 3px 8px; border-radius: 12px;
-            font-size: 11px; font-weight: bold;
-        }
-        .badge.verde { background: #d4edda; color: #155724; }
-        .badge.rojo { background: #ffe0e0; color: #c0392b; }
-    </style>
-</head>
-<body>
+    <div class="sb-header">🎓 U. Católica de Colombia</div>
 
-<!-- ── SIDEBAR ── -->
-<div class="sidebar">
-    <h2>🎓 Universidad Católica<br>de Colombia</h2>
-
-    <div class="info">
-        <span>Código:</span>
-        <strong id="sb-codigo">{{ codigo }}</strong>
-        <span style="margin-top:8px;">Rol:</span>
-        <strong id="sb-rol">{{ rol }}</strong>
+    {# Información del usuario autenticado.
+       Jinja2 — variables del contexto de FastAPI: rol, codigo #}
+    <div class="sb-info">
+      <span>Código institucional</span>
+      <strong>{{ codigo | default('—') }}</strong>
+      <span style="margin-top:8px;">Rol</span>
+      <strong style="color:var(--c-ama);">{{ rol | default('Sin rol') }}</strong>
     </div>
 
-    <nav id="nav-menu">
-        <button class="activo" onclick="mostrarSeccion('horario')">📅 Mi Horario</button>
-        <!-- Los botones adicionales se inyectan según el rol -->
+    <nav class="sb-nav" id="nav-sb">
+      <button class="sb-btn activo" onclick="mostrarSeccion('horario', this)">
+        📅 Mi Horario
+      </button>
+
+      {# Jinja2 — Condicional por rol: cada rol ve solo sus opciones. #}
+      {% if rol == 'Estudiante' %}
+        <button class="sb-btn" onclick="mostrarSeccion('inscribir', this)">
+          📝 Inscribir Materia
+        </button>
+      {% elif rol == 'Profesor' %}
+        <button class="sb-btn" onclick="mostrarSeccion('salones', this)">
+          🏫 Cambiar Salón
+        </button>
+      {% elif rol == 'Administrador' %}
+        <button class="sb-btn" onclick="mostrarSeccion('optimizar', this)">
+          🤖 Optimizar Horarios
+        </button>
+        <button class="sb-btn" onclick="mostrarSeccion('config', this)">
+          ⚙️ Configurar Página
+        </button>
+      {% endif %}
     </nav>
 
     <button class="btn-logout" onclick="cerrarSesion()">🔒 Cerrar Sesión</button>
-</div>
 
-<!-- ── CONTENIDO PRINCIPAL ── -->
-<div class="contenido" id="contenido">
+  </aside>
+
+  {# ══════════════════════════════════
+     ÁREA DE CONTENIDO DINÁMICO
+     Se rellena por JavaScript según la sección activa.
+     ══════════════════════════════════ #}
+  <div class="app-main" id="contenido-app">
     <div class="cargando">Cargando información...</div>
+  </div>
+
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    const TOKEN  = "{{ token }}";
-    const ROL    = "{{ rol }}";
-    const CODIGO = "{{ codigo }}";
-    const API    = window.location.origin;
+  /* ─────────────────────────────────────────────────────
+     SRP: cada función tiene una sola responsabilidad.
+     DIP: las funciones dependen de `apiGet`/`apiPost`
+          (abstracciones), no de fetch() directamente.
+     OCP: agregar una sección nueva es agregar un
+          render*() sin modificar los existentes.
+     ───────────────────────────────────────────────────── */
 
-    // ── Inicialización ──
-    document.addEventListener("DOMContentLoaded", () => {
-        configurarNav();
-        mostrarSeccion("horario");
+  const TOKEN  = "{{ token }}";
+  const ROL    = "{{ rol }}";
+  const CODIGO = "{{ codigo }}";
+  const API    = window.location.origin;
+
+  /* ── Sidebar responsive ── */
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('abierta');
+    document.getElementById('overlay').classList.toggle('visible');
+  }
+
+  /* ── Navegación ── */
+  function mostrarSeccion(sec, btn) {
+    document.querySelectorAll('.sb-btn').forEach(b => b.classList.remove('activo'));
+    if (btn) btn.classList.add('activo');
+    if (window.innerWidth <= 1024) toggleSidebar();  /* cierra en móvil al navegar */
+    const mapa = {
+      horario:   renderHorario,
+      inscribir: renderInscribir,
+      salones:   renderSalones,
+      optimizar: renderOptimizar,
+      config:    renderConfig
+    };
+    if (mapa[sec]) mapa[sec]();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => mostrarSeccion('horario'));
+
+  /* ── Abstracciones HTTP (DIP) ── */
+  async function apiGet(url) {
+    const r = await fetch(`${API}${url}?token=${TOKEN}`);
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || 'Error del servidor.'); }
+    return r.json();
+  }
+  async function apiPost(url, body) {
+    const r = await fetch(`${API}${url}?token=${TOKEN}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Error del servidor.');
+    return d;
+  }
+  async function apiPut(url) {
+    const r = await fetch(`${API}${url}&token=${TOKEN}`, { method: 'PUT' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Error del servidor.');
+    return d;
+  }
 
-    function configurarNav() {
-        const nav = document.getElementById("nav-menu");
-        if (ROL === "Estudiante") {
-            nav.innerHTML += `<button onclick="mostrarSeccion('inscribir')">📝 Inscribir Materia</button>`;
-        } else if (ROL === "Profesor") {
-            nav.innerHTML += `<button onclick="mostrarSeccion('salones')">🏫 Cambiar Salón</button>`;
-        } else if (ROL === "Administrador") {
-            nav.innerHTML += `<button onclick="mostrarSeccion('optimizar')">🤖 Optimizar Horarios</button>`;
-            nav.innerHTML += `<button onclick="mostrarSeccion('config')">⚙️ Configurar Página</button>`;
-        }
+  /* ── Helpers de UI ── */
+  function contenido(html) { document.getElementById('contenido-app').innerHTML = html; }
+  function panel(titulo, html) {
+    return `<div class="app-panel"><h3>${titulo}</h3>${html}</div>`;
+  }
+  function alertaHtml(tipo, msg) {
+    return `<div class="alerta ${tipo}">${tipo==='err'?'⚠️':'✅'} ${msg}</div>`;
+  }
+
+  /* ════════════════════════════════════════════
+     SECCIÓN: HORARIO
+     ════════════════════════════════════════════ */
+  async function renderHorario() {
+    contenido(`<div class="cargando">Cargando horario...</div>`);
+    try {
+      const h    = await apiGet('/horarios');
+      const dias  = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+      const horas = Object.keys(h).sort();
+
+      if (!horas.length) {
+        contenido(panel('📅 Mi Horario',
+          `<div class="estado-vacio"><span>📋</span>No hay clases asignadas actualmente.</div>`
+        ));
+        return;
+      }
+
+      const filas = horas.map(hr => {
+        const celdas = dias.map(dia => {
+          const cl = h[hr]?.[dia];
+          return cl
+            ? `<td class="ocu"><strong>${cl.materia}</strong><br><small>${cl.salon}</small><br><small>${cl.info_extra}</small></td>`
+            : `<td class="vac">—</td>`;
+        }).join('');
+        return `<tr><td><strong>${hr}</strong></td>${celdas}</tr>`;
+      }).join('');
+
+      contenido(panel('📅 Mi Horario',
+        `<div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Hora</th>${dias.map(d=>`<th>${d}</th>`).join('')}</tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>`
+      ));
+    } catch(e) {
+      contenido(panel('📅 Mi Horario', alertaHtml('err', e.message)));
     }
+  }
 
-    // ── Navegación ──
-    function mostrarSeccion(seccion) {
-        document.querySelectorAll(".sidebar nav button").forEach(b => b.classList.remove("activo"));
-        event && event.target && event.target.classList && event.target.classList.add("activo");
+  /* ════════════════════════════════════════════
+     SECCIÓN: INSCRIBIR (Estudiante)
+     ════════════════════════════════════════════ */
+  function renderInscribir() {
+    contenido(panel('📝 Inscribir Materia',
+      `<div id="ae" class="alerta"></div>
+       <div id="ao" class="alerta"></div>
+       <div class="frm-fila">
+         <input type="number" id="id-mat" class="campo" placeholder="ID de la materia (ej: 1)" min="1">
+         <button class="btn-p" onclick="buscarGrupos()" style="width:auto;">Buscar Grupos</button>
+       </div>
+       <div id="grupos-res"></div>`
+    ));
+  }
 
-        const c = document.getElementById("contenido");
-        c.innerHTML = `<div class="cargando">⏳ Cargando...</div>`;
-
-        const secciones = {
-            horario:   renderHorario,
-            inscribir: renderInscribir,
-            salones:   renderSalones,
-            optimizar: renderOptimizar,
-            config:    renderConfig
-        };
-        if (secciones[seccion]) secciones[seccion]();
+  async function buscarGrupos() {
+    const idM = parseInt(document.getElementById('id-mat').value);
+    const res = document.getElementById('grupos-res');
+    const ae  = document.getElementById('ae');
+    ae.className = 'alerta';
+    if (!idM || idM < 1) {
+      ae.className = 'alerta err'; ae.innerHTML = '⚠️ Ingrese un ID de materia válido.'; return;
     }
-
-    // ── Manejo de errores de API ──
-    async function apiGet(url) {
-        const r = await fetch(`${API}${url}?token=${TOKEN}`);
-        if (!r.ok) { const d = await r.json(); throw new Error(d.detail || "Error del servidor."); }
-        return r.json();
+    res.innerHTML = `<div class="cargando">Buscando grupos...</div>`;
+    try {
+      const gs = await apiGet(`/materias/${idM}/grupos`);
+      if (!gs.length) {
+        res.innerHTML = `<p style="color:var(--c-txts);margin-top:12px;">Sin grupos existentes. Se creará uno al inscribirse.</p>
+          <button class="btn-ok" style="margin-top:10px;" onclick="inscribirse(${idM},null)">Inscribirse (grupo automático)</button>`;
+        return;
+      }
+      const filas = gs.map(g => `
+        <tr>
+          <td>Grupo ${g.num_grupo}</td>
+          <td>${g.dia||'—'}</td><td>${g.hora||'—'}</td>
+          <td><span class="badge ${g.inscritos<g.limite?'badge-ok':'badge-err'}">${g.inscritos}/${g.limite}</span></td>
+          <td><button class="btn-ok" onclick="inscribirse(${idM},${g.id_grupo})">Elegir</button></td>
+        </tr>`).join('');
+      res.innerHTML = `
+        <div class="tbl-wrap" style="margin-top:12px;">
+          <table class="tbl tbl-g">
+            <thead><tr><th>Grupo</th><th>Día</th><th>Hora</th><th>Cupo</th><th>Acción</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>
+        <button class="btn-s" style="margin-top:12px;" onclick="inscribirse(${idM},null)">Asignar automáticamente</button>`;
+    } catch(e) {
+      res.innerHTML = '';
+      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
     }
+  }
 
-    async function apiPost(url, body) {
-        const r = await fetch(`${API}${url}?token=${TOKEN}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
-        });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.detail || "Error del servidor.");
-        return d;
+  async function inscribirse(idMat, idGrupo) {
+    const ae = document.getElementById('ae');
+    const ao = document.getElementById('ao');
+    ae.className = ao.className = 'alerta';
+    try {
+      const r = await apiPost('/inscribir', { id_materia: idMat, id_grupo: idGrupo });
+      ao.className = 'alerta ok'; ao.innerHTML = '✅ ' + r.mensaje;
+      document.getElementById('grupos-res').innerHTML = '';
+    } catch(e) {
+      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
     }
+  }
 
-    async function apiPut(url) {
-        const r = await fetch(`${API}${url}&token=${TOKEN}`, { method: "PUT" });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.detail || "Error del servidor.");
-        return d;
+  /* ════════════════════════════════════════════
+     SECCIÓN: SALONES (Profesor)
+     ════════════════════════════════════════════ */
+  function renderSalones() {
+    contenido(panel('🏫 Cambiar Salón de Grupo',
+      `<div id="ae" class="alerta"></div>
+       <div id="ao" class="alerta"></div>
+       <div class="frm-fila">
+         <input type="number" id="id-grp" class="campo" placeholder="ID del grupo (ej: 1)" min="1">
+         <button class="btn-p" onclick="buscarSalones()" style="width:auto;">Ver Salones Disponibles</button>
+       </div>
+       <div id="salones-res"></div>`
+    ));
+  }
+
+  async function buscarSalones() {
+    const idG = parseInt(document.getElementById('id-grp').value);
+    const res = document.getElementById('salones-res');
+    const ae  = document.getElementById('ae');
+    ae.className = 'alerta';
+    if (!idG || idG < 1) {
+      ae.className = 'alerta err'; ae.innerHTML = '⚠️ Ingrese un ID de grupo válido.'; return;
     }
-
-    // ────────────────────────────────────────────
-    // SECCIÓN: HORARIO
-    // ────────────────────────────────────────────
-    async function renderHorario() {
-        const c = document.getElementById("contenido");
-        try {
-            const horario = await apiGet("/horarios");
-            const horas   = Object.keys(horario).sort();
-            const dias    = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
-
-            if (horas.length === 0) {
-                c.innerHTML = `
-                <div class="panel">
-                    <h3>📅 Mi Horario</h3>
-                    <p style="color:#888; text-align:center; padding:20px;">
-                        No tienes clases asignadas actualmente.
-                    </p>
-                </div>`;
-                return;
-            }
-
-            let filas = horas.map(hora => {
-                let celdas = dias.map(dia => {
-                    const cl = horario[hora] && horario[hora][dia];
-                    if (cl) {
-                        return `<td class="ocupado">
-                            <strong>${cl.materia}</strong>
-                            <small>${cl.salon}</small><br>
-                            <small>${cl.info_extra}</small>
-                        </td>`;
-                    }
-                    return `<td class="vacio">—</td>`;
-                }).join("");
-                return `<tr><td><strong>${hora}</strong></td>${celdas}</tr>`;
-            }).join("");
-
-            c.innerHTML = `
-            <div class="panel">
-                <h3>📅 Mi Horario</h3>
-                <div style="overflow-x:auto;">
-                <table class="tabla-horario">
-                    <thead><tr>
-                        <th>Hora</th>
-                        ${dias.map(d => `<th>${d}</th>`).join("")}
-                    </tr></thead>
-                    <tbody>${filas}</tbody>
-                </table>
-                </div>
-            </div>`;
-        } catch (e) {
-            c.innerHTML = `<div class="panel"><div class="msg-error" style="display:block;">⚠️ ${e.message}</div></div>`;
-        }
-    }
-
-    // ────────────────────────────────────────────
-    // SECCIÓN: INSCRIBIR (Estudiante)
-    // ────────────────────────────────────────────
-    async function renderInscribir() {
-        const c = document.getElementById("contenido");
-        c.innerHTML = `
-        <div class="panel">
-            <h3>📝 Inscribir Materia</h3>
-            <div id="err-ins" class="msg-error"></div>
-            <div id="ok-ins" class="msg-exito"></div>
-            <label style="font-size:13px; color:#555;">ID de la materia:</label><br>
-            <input type="number" id="id-mat" placeholder="Ej: 1" min="1" style="width:180px;">
-            <button class="btn-accion" onclick="buscarGrupos()">Buscar Grupos</button>
-            <div id="grupos-cont" style="margin-top:16px;"></div>
+    res.innerHTML = `<div class="cargando">Buscando salones...</div>`;
+    try {
+      const ss = await apiGet(`/profesor/salones-disponibles/${idG}`);
+      if (!ss.length) { res.innerHTML = `<p style="color:var(--c-txts);margin-top:12px;">Sin salones disponibles en este horario.</p>`; return; }
+      const filas = ss.map(s => `
+        <tr>
+          <td>${s.nombre}</td>
+          <td>${s.capacidad} personas</td>
+          <td><button class="btn-ok" onclick="cambiarSalon(${idG},${s.id})">Seleccionar</button></td>
+        </tr>`).join('');
+      res.innerHTML = `
+        <div class="tbl-wrap" style="margin-top:12px;">
+          <table class="tbl tbl-g">
+            <thead><tr><th>Salón</th><th>Capacidad</th><th>Acción</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
         </div>`;
+    } catch(e) {
+      res.innerHTML = '';
+      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
     }
+  }
 
-    async function buscarGrupos() {
-        const idMat = parseInt(document.getElementById("id-mat").value);
-        const cont  = document.getElementById("grupos-cont");
-        const errEl = document.getElementById("err-ins");
-        errEl.style.display = "none";
-
-        if (!idMat || idMat < 1) {
-            errEl.innerHTML = "⚠️ Ingrese un ID de materia válido.";
-            errEl.style.display = "block"; return;
-        }
-
-        cont.innerHTML = `<div class="cargando">Buscando grupos...</div>`;
-        try {
-            const grupos = await apiGet(`/materias/${idMat}/grupos`);
-            if (!grupos.length) {
-                cont.innerHTML = `<p style="color:#888;">No hay grupos disponibles. Se creará uno al inscribirse.</p>`;
-            } else {
-                const filas = grupos.map(g => `
-                <tr>
-                    <td>Grupo ${g.num_grupo}</td>
-                    <td>${g.dia || "—"}</td>
-                    <td>${g.hora || "—"}</td>
-                    <td>
-                        <span class="badge ${g.inscritos < g.limite ? "verde" : "rojo"}">
-                            ${g.inscritos}/${g.limite}
-                        </span>
-                    </td>
-                    <td><button class="btn-accion verde" onclick="inscribirse(${idMat}, ${g.id_grupo})">Elegir</button></td>
-                </tr>`).join("");
-                cont.innerHTML = `
-                <table class="tabla-grupos">
-                    <thead><tr><th>Grupo</th><th>Día</th><th>Hora</th><th>Cupo</th><th>Acción</th></tr></thead>
-                    <tbody>${filas}</tbody>
-                </table>
-                <button class="btn-accion" style="margin-top:12px;" onclick="inscribirse(${idMat}, null)">
-                    Asignar automáticamente
-                </button>`;
-            }
-        } catch(e) {
-            cont.innerHTML = "";
-            errEl.innerHTML = "⚠️ " + e.message;
-            errEl.style.display = "block";
-        }
+  async function cambiarSalon(idG, idS) {
+    const ae = document.getElementById('ae');
+    const ao = document.getElementById('ao');
+    ae.className = ao.className = 'alerta';
+    try {
+      const r = await apiPut(`/profesor/cambiar-salon?id_grupo=${idG}&id_nuevo_salon=${idS}`);
+      ao.className = 'alerta ok'; ao.innerHTML = '✅ ' + r.mensaje;
+      document.getElementById('salones-res').innerHTML = '';
+    } catch(e) {
+      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
     }
+  }
 
-    async function inscribirse(idMat, idGrupo) {
-        const errEl = document.getElementById("err-ins");
-        const okEl  = document.getElementById("ok-ins");
-        errEl.style.display = "none";
-        okEl.style.display  = "none";
-        try {
-            const r = await apiPost("/inscribir", { id_materia: idMat, id_grupo: idGrupo });
-            okEl.innerHTML     = "✅ " + r.mensaje;
-            okEl.style.display = "block";
-            document.getElementById("grupos-cont").innerHTML = "";
-        } catch(e) {
-            errEl.innerHTML     = "⚠️ " + e.message;
-            errEl.style.display = "block";
-        }
+  /* ════════════════════════════════════════════
+     SECCIÓN: OPTIMIZAR (Admin)
+     ════════════════════════════════════════════ */
+  function renderOptimizar() {
+    contenido(panel('🤖 Optimización Genética',
+      `<p style="font-size:13px;color:var(--c-txts);margin-bottom:20px;line-height:1.7;">
+         Ejecuta el algoritmo genético para reasignar salones minimizando cruces
+         y respetando capacidades. Puede tardar unos segundos.
+       </p>
+       <div id="ae" class="alerta"></div>
+       <div id="ao" class="alerta"></div>
+       <button class="btn-ok" id="btn-opt" onclick="ejecutarOpt()" style="padding:12px 24px;font-size:14px;">
+         ▶ Ejecutar Optimización
+       </button>`
+    ));
+  }
+
+  async function ejecutarOpt() {
+    const ae = document.getElementById('ae');
+    const ao = document.getElementById('ao');
+    const btn = document.getElementById('btn-opt');
+    ae.className = ao.className = 'alerta';
+    btn.disabled = true; btn.innerText = '⏳ Procesando...';
+    try {
+      const r = await apiPost('/admin/optimizar-horarios', {});
+      ao.className = 'alerta ok'; ao.innerHTML = '✅ ' + (r.mensaje || JSON.stringify(r));
+    } catch(e) {
+      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
+    } finally {
+      btn.disabled = false; btn.innerText = '▶ Ejecutar Optimización';
     }
+  }
 
-    // ────────────────────────────────────────────
-    // SECCIÓN: CAMBIAR SALÓN (Profesor)
-    // ────────────────────────────────────────────
-    async function renderSalones() {
-        const c = document.getElementById("contenido");
-        c.innerHTML = `
-        <div class="panel">
-            <h3>🏫 Cambiar Salón de un Grupo</h3>
-            <div id="err-sal" class="msg-error"></div>
-            <div id="ok-sal"  class="msg-exito"></div>
-            <label style="font-size:13px; color:#555;">ID del grupo:</label><br>
-            <input type="number" id="id-grp" placeholder="Ej: 1" min="1" style="width:180px;">
-            <button class="btn-accion" onclick="buscarSalones()">Ver Salones Disponibles</button>
-            <div id="salones-cont" style="margin-top:16px;"></div>
-        </div>`;
+  /* ════════════════════════════════════════════
+     SECCIÓN: CONFIG (Admin)
+     ════════════════════════════════════════════ */
+  async function renderConfig() {
+    contenido(`<div class="cargando">Cargando configuración...</div>`);
+    try {
+      const d = await fetch(`${API}/front/config`).then(r => r.json());
+      const campo = (id, label, val) =>
+        `<div class="campo-grp">
+           <label class="label">${label}</label>
+           <input id="${id}" type="text" class="campo" value="${val||''}">
+         </div>`;
+      contenido(panel('⚙️ Configurar Página de Login',
+        `<div id="ae" class="alerta"></div>
+         <div id="ao" class="alerta"></div>
+         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
+           ${campo('m1','Mensaje 1 (título izquierdo)',d.mensaje_1)}
+           ${campo('m2','Mensaje 2 (subtítulo izq.)',d.mensaje_2)}
+           ${campo('m3','Mensaje 3 (título derecho)',d.mensaje_3)}
+           ${campo('m4','Mensaje 4 (subtítulo der.)',d.mensaje_4)}
+           ${campo('i1','URL Imagen 1 (carrusel UCC)',d.url_img_1)}
+           ${campo('i2','URL Imagen 2 (carrusel UCC)',d.url_img_2)}
+           ${campo('i3','URL Imagen 3 (carrusel UCC)',d.url_img_3)}
+         </div>
+         <small style="font-size:11px;color:var(--c-txts);display:block;margin-bottom:12px;">
+           💡 Para imágenes UCC usa fotos de: www.ucatolica.edu.co/portal/wp-content/uploads/
+         </small>
+         <button class="btn-ok" onclick="guardarConfig()" style="padding:12px 24px;">💾 Guardar Cambios</button>`
+      ));
+    } catch(e) {
+      contenido(panel('⚙️ Configurar Página', alertaHtml('err', e.message)));
     }
+  }
 
-    async function buscarSalones() {
-        const idGrp = parseInt(document.getElementById("id-grp").value);
-        const cont  = document.getElementById("salones-cont");
-        const errEl = document.getElementById("err-sal");
-        errEl.style.display = "none";
-
-        if (!idGrp || idGrp < 1) {
-            errEl.innerHTML = "⚠️ Ingrese un ID de grupo válido.";
-            errEl.style.display = "block"; return;
-        }
-
-        cont.innerHTML = `<div class="cargando">Buscando salones...</div>`;
-        try {
-            const salones = await apiGet(`/profesor/salones-disponibles/${idGrp}`);
-            if (!salones.length) {
-                cont.innerHTML = `<p style="color:#888;">No hay salones disponibles para este horario.</p>`;
-                return;
-            }
-            const filas = salones.map(s => `
-            <tr>
-                <td>${s.nombre}</td>
-                <td>${s.capacidad} personas</td>
-                <td><button class="btn-accion verde" onclick="cambiarSalon(${idGrp}, ${s.id})">Seleccionar</button></td>
-            </tr>`).join("");
-            cont.innerHTML = `
-            <table class="tabla-grupos">
-                <thead><tr><th>Salón</th><th>Capacidad</th><th>Acción</th></tr></thead>
-                <tbody>${filas}</tbody>
-            </table>`;
-        } catch(e) {
-            cont.innerHTML = "";
-            errEl.innerHTML = "⚠️ " + e.message;
-            errEl.style.display = "block";
-        }
+  async function guardarConfig() {
+    const ae = document.getElementById('ae');
+    const ao = document.getElementById('ao');
+    ae.className = ao.className = 'alerta';
+    const val = id => document.getElementById(id)?.value || '';
+    try {
+      const r = await fetch(`${API}/front/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          codigo_admin: CODIGO,
+          msg_1: val('m1'), msg_2: val('m2'), msg_3: val('m3'), msg_4: val('m4'),
+          img_1: val('i1'), img_2: val('i2'), img_3: val('i3')
+        })
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail);
+      ao.className = 'alerta ok'; ao.innerHTML = '✅ ' + d.mensaje;
+    } catch(e) {
+      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
     }
+  }
 
-    async function cambiarSalon(idGrp, idSalon) {
-        const errEl = document.getElementById("err-sal");
-        const okEl  = document.getElementById("ok-sal");
-        errEl.style.display = "none";
-        okEl.style.display  = "none";
-        try {
-            const r = await apiPut(`/profesor/cambiar-salon?id_grupo=${idGrp}&id_nuevo_salon=${idSalon}`);
-            okEl.innerHTML     = "✅ " + r.mensaje;
-            okEl.style.display = "block";
-            document.getElementById("salones-cont").innerHTML = "";
-        } catch(e) {
-            errEl.innerHTML     = "⚠️ " + e.message;
-            errEl.style.display = "block";
-        }
-    }
-
-    // ────────────────────────────────────────────
-    // SECCIÓN: OPTIMIZAR (Admin)
-    // ────────────────────────────────────────────
-    async function renderOptimizar() {
-        const c = document.getElementById("contenido");
-        c.innerHTML = `
-        <div class="panel">
-            <h3>🤖 Optimización Genética de Horarios</h3>
-            <p style="color:#555; font-size:13px; margin-bottom:16px;">
-                Ejecuta el algoritmo genético para reasignar salones minimizando cruces y respetando capacidades.
-                Este proceso puede tardar unos segundos.
-            </p>
-            <div id="err-opt" class="msg-error"></div>
-            <div id="ok-opt"  class="msg-exito"></div>
-            <button class="btn-accion verde" id="btn-opt" onclick="ejecutarOptimizacion()">
-                ▶ Ejecutar Optimización
-            </button>
-        </div>`;
-    }
-
-    async function ejecutarOptimizacion() {
-        const errEl = document.getElementById("err-opt");
-        const okEl  = document.getElementById("ok-opt");
-        const btn   = document.getElementById("btn-opt");
-        errEl.style.display = "none";
-        okEl.style.display  = "none";
-        btn.disabled    = true;
-        btn.innerText   = "⏳ Procesando...";
-
-        try {
-            const r = await apiPost("/admin/optimizar-horarios", {});
-            okEl.innerHTML     = "✅ " + (r.mensaje || JSON.stringify(r));
-            okEl.style.display = "block";
-        } catch(e) {
-            errEl.innerHTML     = "⚠️ " + e.message;
-            errEl.style.display = "block";
-        } finally {
-            btn.disabled  = false;
-            btn.innerText = "▶ Ejecutar Optimización";
-        }
-    }
-
-    // ────────────────────────────────────────────
-    // SECCIÓN: CONFIG (Admin)
-    // ────────────────────────────────────────────
-    async function renderConfig() {
-        const c = document.getElementById("contenido");
-        c.innerHTML = `<div class="cargando">Cargando configuración...</div>`;
-        try {
-            const d = await fetch(`${API}/front/config`).then(r => r.json());
-            c.innerHTML = `
-            <div class="panel">
-                <h3>⚙️ Configurar Página de Login</h3>
-                <div id="err-cfg" class="msg-error"></div>
-                <div id="ok-cfg"  class="msg-exito"></div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
-                    <div>
-                        <label style="font-size:12px; color:#555;">Mensaje 1</label><br>
-                        <input id="m1" type="text" value="${d.mensaje_1}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                    </div>
-                    <div>
-                        <label style="font-size:12px; color:#555;">Mensaje 2</label><br>
-                        <input id="m2" type="text" value="${d.mensaje_2}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                    </div>
-                    <div>
-                        <label style="font-size:12px; color:#555;">Mensaje 3</label><br>
-                        <input id="m3" type="text" value="${d.mensaje_3}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                    </div>
-                    <div>
-                        <label style="font-size:12px; color:#555;">Mensaje 4</label><br>
-                        <input id="m4" type="text" value="${d.mensaje_4}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                    </div>
-                    <div>
-                        <label style="font-size:12px; color:#555;">URL Imagen 1</label><br>
-                        <input id="i1" type="text" value="${d.url_img_1}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                    </div>
-                    <div>
-                        <label style="font-size:12px; color:#555;">URL Imagen 2</label><br>
-                        <input id="i2" type="text" value="${d.url_img_2}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                    </div>
-                    <div>
-                        <label style="font-size:12px; color:#555;">URL Imagen 3</label><br>
-                        <input id="i3" type="text" value="${d.url_img_3}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                    </div>
-                </div>
-                <button class="btn-accion verde" onclick="guardarConfig()">💾 Guardar Cambios</button>
-            </div>`;
-        } catch(e) {
-            c.innerHTML = `<div class="panel"><div class="msg-error" style="display:block;">⚠️ ${e.message}</div></div>`;
-        }
-    }
-
-    async function guardarConfig() {
-        const errEl = document.getElementById("err-cfg");
-        const okEl  = document.getElementById("ok-cfg");
-        errEl.style.display = "none";
-        okEl.style.display  = "none";
-        try {
-            const r = await fetch(`${API}/front/config`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    codigo_admin: CODIGO,
-                    msg_1: document.getElementById("m1").value,
-                    msg_2: document.getElementById("m2").value,
-                    msg_3: document.getElementById("m3").value,
-                    msg_4: document.getElementById("m4").value,
-                    img_1: document.getElementById("i1").value,
-                    img_2: document.getElementById("i2").value,
-                    img_3: document.getElementById("i3").value
-                })
-            });
-            const d = await r.json();
-            if (!r.ok) throw new Error(d.detail);
-            okEl.innerHTML     = "✅ " + d.mensaje;
-            okEl.style.display = "block";
-        } catch(e) {
-            errEl.innerHTML     = "⚠️ " + e.message;
-            errEl.style.display = "block";
-        }
-    }
-
-    // ── Cerrar sesión ──
-    async function cerrarSesion() {
-        try {
-            await fetch(`${API}/logout?token=${TOKEN}`, { method: "POST" });
-        } catch(e) {}
-        window.location.href = "/login";
-    }
+  /* ── Cerrar sesión ── */
+  async function cerrarSesion() {
+    try { await fetch(`${API}/logout?token=${TOKEN}`, { method: 'POST' }); } catch{}
+    window.location.href = '/login';
+  }
 </script>
-</body>
-</html>
+{% endblock %}

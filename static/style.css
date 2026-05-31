@@ -1,77 +1,614 @@
+/* ================================================================
+   SISTEMA DE ASIGNACIÓN DE SALONES
+   Universidad Católica de Colombia
+   
+   Colorimetría institucional:
+     Primario oscuro  → #0d1b4c  (autoridad, confianza)
+     Primario medio   → #4f79a6  (academicismo, calma)
+     Primario claro   → #a8c5e8  (apoyo, detalle)
+     Acento CTA       → #ffeb3b  (amarillo: guía la acción — Patrón F)
+     Fondo neutro     → #f4f6f9  (limpieza, lectura)
+   
+   Contraste WCAG AA:
+     Texto oscuro / blanco  →  12:1  ✓ AAA
+     Amarillo  / azul osc.  →   8:1  ✓ AA
+     Azul med. / blanco     →   4.5:1 ✓ AA
+   ================================================================ */
 
-body {
-    font-family: Arial;
-    background: #f2f2f2;
-    text-align: center;
-    margin: 0;
+/* ── Variables — Single Source of Truth ── */
+:root {
+  --c-osc:    #0d1b4c;
+  --c-med:    #4f79a6;
+  --c-cla:    #a8c5e8;
+  --c-azfon:  #e8f0fe;
+  --c-ama:    #ffeb3b;
+  --c-amah:   #f0d800;
+  --c-bla:    #ffffff;
+  --c-gris:   #f4f6f9;
+  --c-borde:  #dce3ed;
+  --c-txt:    #0d1b4c;
+  --c-txtm:   #3a4a6b;
+  --c-txts:   #6b7c9e;
+  --c-err:    #c0392b;
+  --c-errf:   #ffe0e0;
+  --c-ok:     #155724;
+  --c-okf:    #d4edda;
+
+  --r:        8px;
+  --r-lg:     16px;
+  --sh-sm:    0 2px 8px  rgba(13,27,76,.10);
+  --sh-md:    0 4px 20px rgba(13,27,76,.15);
+  --sh-lg:    0 8px 32px rgba(13,27,76,.18);
+  --tr:       all .25s ease;
+  --hh:       68px;          /* altura del header */
 }
 
+/* ── Reset base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html   { scroll-behavior: smooth; font-size: 16px; }
+body   {
+  font-family: 'Segoe UI', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--c-gris);
+  color: var(--c-txt);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+img    { max-width: 100%; display: block; }
+a      { text-decoration: none; color: inherit; }
+button { font-family: inherit; cursor: pointer; }
 
-.top {
-    background: #2f4f6f;
-    color: white;
-    padding: 20px;
+/* ================================================================
+   HEADER
+   Patrón F — Barra horizontal superior: zona de MÁXIMA
+   fijación visual (Nielsen, 2006). Logo e identidad van
+   en la esquina superior-izquierda, inicio del barrido en F.
+   ================================================================ */
+.header-ucc {
+  position: sticky; top: 0; z-index: 900;
+  height: var(--hh);
+  background: var(--c-osc);
+  box-shadow: var(--sh-md);
+  border-bottom: 3px solid var(--c-ama);
+}
+.header-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 0 24px; height: 100%;
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 16px;
 }
 
+/* Escudo UCC en CSS — sin imagen externa */
+.logo-link { display: flex; align-items: center; gap: 12px; }
+.logo-escudo {
+  width: 46px; height: 46px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--c-med), var(--c-cla));
+  border: 2px solid var(--c-ama);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: var(--c-ama);
+}
+.logo-texto { display: flex; flex-direction: column; line-height: 1.2; }
+.logo-n  { font-size: 14px; font-weight: 700; color: var(--c-bla); letter-spacing: .01em; }
+.logo-s  { font-size: 10px; color: var(--c-cla); text-transform: uppercase; letter-spacing: .06em; }
 
-.menu {
-    margin-top: 50px;
+.nav-superior { display: flex; align-items: center; gap: 16px; }
+.nav-chip {
+  font-size: 11px; color: var(--c-cla);
+  border-left: 1px solid var(--c-med);
+  padding-left: 16px; line-height: 1.4;
+  display: flex; flex-direction: column;
+}
+.nav-chip strong { color: var(--c-bla); font-size: 12px; }
+
+@media (max-width: 600px) {
+  .nav-chip  { display: none; }
+  .logo-n    { font-size: 12px; }
+  .header-inner { padding: 0 16px; }
 }
 
+/* ================================================================
+   MAIN — crece para empujar el footer al fondo
+   ================================================================ */
+.main-cnt { flex: 1; }
 
-.btn {
-    display: block;
-    width: 300px;
-    margin: 15px auto;
-    padding: 15px;
-    background: #3b6ea5;
-    color: white;
-    text-decoration: none;
-    border-radius: 10px;
+/* ================================================================
+   FOOTER REAL — reemplaza la imagen estática
+   OCP: el footer está "cerrado" a cambios; cada página lo hereda.
+   ================================================================ */
+.footer-ucc {
+  background: var(--c-osc);
+  color: var(--c-bla);
+  padding: 44px 0 0;
+}
+.footer-inner {
+  max-width: 1280px; margin: 0 auto; padding: 0 24px 32px;
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1fr;
+  gap: 32px;
+}
+.footer-col h4 {
+  color: var(--c-ama); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+  margin-bottom: 14px;
+}
+.footer-col p, .footer-col li {
+  font-size: 12px; color: var(--c-cla);
+  line-height: 1.8; list-style: none;
+}
+.footer-logo-min { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.footer-esc {
+  width: 38px; height: 38px; flex-shrink: 0;
+  background: var(--c-med); border: 1px solid var(--c-ama);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: var(--c-ama);
+}
+.footer-logo-min strong { font-size: 13px; color: var(--c-bla); display: block; }
+.footer-logo-min small  { font-size: 10px; color: var(--c-txts); }
+.footer-legal { font-size: 11px; color: var(--c-txts); line-height: 1.7; }
+.footer-link  { color: var(--c-ama); font-size: 12px; }
+.footer-link:hover { text-decoration: underline; }
+
+.footer-social { display: flex; gap: 8px; margin-top: 16px; }
+.footer-social a {
+  width: 32px; height: 32px;
+  background: var(--c-med); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--c-bla);
+  transition: var(--tr);
+}
+.footer-social a:hover { background: var(--c-ama); color: var(--c-osc); }
+
+.footer-base {
+  border-top: 1px solid rgba(79,121,166,.4);
+  padding: 14px 24px;
+  max-width: 1280px; margin: 0 auto;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 8px;
+}
+.footer-copy { font-size: 11px; color: var(--c-txts); }
+
+@media (max-width: 900px) {
+  .footer-inner { grid-template-columns: 1fr 1fr; gap: 24px; }
+}
+@media (max-width: 560px) {
+  .footer-inner  { grid-template-columns: 1fr; }
+  .footer-base   { flex-direction: column; text-align: center; }
 }
 
-.btn:hover {
-    background: #2c4e75;
+/* ================================================================
+   COMPONENTES COMPARTIDOS
+   ================================================================ */
+
+/* Botón primario — amarillo como CTA principal (Patrón F: el
+   amarillo guía el ojo al punto de acción más importante) */
+.btn-p {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--c-ama); color: var(--c-osc);
+  border: none; border-radius: var(--r);
+  padding: 13px 28px;
+  font-weight: 700; font-size: 14px; letter-spacing: .04em;
+  cursor: pointer; transition: var(--tr);
+  box-shadow: 0 2px 8px rgba(255,235,59,.35);
+  width: 100%;
+}
+.btn-p:hover  { background: var(--c-amah); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(255,235,59,.45); }
+.btn-p:active { transform: translateY(0); }
+.btn-p:disabled { background: #ccc; color: #888; cursor: not-allowed;
+                   transform: none; box-shadow: none; }
+
+/* Botón secundario */
+.btn-s {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; color: var(--c-med);
+  border: 2px solid var(--c-med); border-radius: var(--r);
+  padding: 11px 24px; font-weight: 600; font-size: 14px;
+  cursor: pointer; transition: var(--tr); text-decoration: none;
+}
+.btn-s:hover { background: var(--c-med); color: var(--c-bla); }
+
+/* Botón de acción verde */
+.btn-ok  { background: #27ae60; color: #fff; border-radius: var(--r); padding: 9px 18px;
+            font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: var(--tr); }
+.btn-ok:hover  { background: #1e8449; }
+
+/* Botón peligro */
+.btn-err { background: var(--c-err); color: #fff; border-radius: var(--r); padding: 9px 18px;
+            font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: var(--tr); }
+.btn-err:hover { background: #962d22; }
+
+/* ── INPUTS CORREGIDOS ──
+   Fondo BLANCO, texto OSCURO, borde sutil.
+   El campo debe verse como campo, no como botón. */
+.campo {
+  display: block; width: 100%;
+  padding: 13px 16px;
+  border-radius: var(--r);
+  border: 2px solid var(--c-borde);
+  background: var(--c-bla);
+  color: var(--c-txt);
+  font-size: 14px; font-family: inherit;
+  outline: none; transition: var(--tr);
+  margin-bottom: 0;
+}
+.campo::placeholder { color: var(--c-txts); }
+.campo:focus {
+  border-color: var(--c-med);
+  box-shadow: 0 0 0 3px rgba(79,121,166,.15);
+}
+.campo.campo-err {
+  border-color: var(--c-err);
+  background: #fff8f8;
 }
 
+.label {
+  display: block; font-size: 11px; font-weight: 700;
+  color: var(--c-txtm); margin-bottom: 6px;
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.campo-grp { margin-bottom: 16px; }
 
-.login-box {
-    margin-top: 100px;
+/* ── Alertas ── */
+.alerta {
+  border-radius: var(--r); padding: 12px 16px;
+  font-size: 13px; line-height: 1.5;
+  margin-bottom: 16px; display: none;
+}
+.alerta.err { background: var(--c-errf); color: var(--c-err);
+               border: 1px solid #f5c6cb; display: block; }
+.alerta.ok  { background: var(--c-okf);  color: var(--c-ok);
+               border: 1px solid #c3e6cb; display: block; }
+
+/* ── Cards ── */
+.card {
+  background: var(--c-bla); border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm); padding: 24px;
+  transition: var(--tr);
 }
 
-input {
-    display: block;
-    margin: 10px auto;
-    padding: 10px;
-    width: 250px;
+/* ── Badge ── */
+.badge {
+  display: inline-block; padding: 3px 8px;
+  border-radius: 20px; font-size: 11px; font-weight: 700;
+}
+.badge-ok  { background: var(--c-okf);  color: var(--c-ok); }
+.badge-err { background: var(--c-errf); color: var(--c-err); }
+
+/* ================================================================
+   INDEX — Patrón F aplicado:
+   1ª línea H: header (logo izq.)
+   2ª línea H: hero (título + botón izq.)
+   Línea V: cards de servicio izq. → der.
+   ================================================================ */
+.hero-idx {
+  background: linear-gradient(135deg, var(--c-osc) 0%, #1a3567 60%, var(--c-med) 100%);
+  color: var(--c-bla);
+  padding: 64px 24px 48px;
+  position: relative; overflow: hidden;
+}
+.hero-idx::before {              /* Textura geométrica sutil */
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(circle at 80% 20%, rgba(255,235,59,.08) 0%, transparent 50%),
+    radial-gradient(circle at 10% 80%, rgba(79,121,166,.15) 0%, transparent 40%);
+  pointer-events: none;
+}
+.hero-inner { max-width: 1280px; margin: 0 auto; position: relative; z-index: 1; }
+.hero-tag {
+  display: inline-block;
+  background: var(--c-ama); color: var(--c-osc);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; padding: 4px 12px; border-radius: 20px;
+  margin-bottom: 16px;
+}
+.hero-idx h1 {
+  font-size: clamp(24px, 4vw, 42px); font-weight: 800;
+  line-height: 1.15; margin-bottom: 14px;
+  max-width: 620px;
+}
+.hero-idx h1 span { color: var(--c-ama); }
+.hero-idx p {
+  font-size: 15px; color: var(--c-cla);
+  max-width: 520px; line-height: 1.75; margin-bottom: 28px;
+}
+.hero-btns { display: flex; gap: 12px; flex-wrap: wrap; }
+.hero-btns .btn-p { width: auto; }
+
+/* Sección servicios */
+.sec-srv { max-width: 1280px; margin: 0 auto; padding: 48px 24px; }
+.sec-hdr { margin-bottom: 28px; }
+.sec-hdr h2 {
+  font-size: 22px; font-weight: 800; color: var(--c-osc);
+  display: inline-block; padding-bottom: 10px;
+  border-bottom: 3px solid var(--c-ama);
+  margin-bottom: 8px;
+}
+.sec-hdr p { font-size: 13px; color: var(--c-txts); }
+
+.grid-srv {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 20px;
+}
+.card-srv {
+  background: var(--c-bla); border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+  padding: 28px 22px;
+  display: flex; flex-direction: column; gap: 10px;
+  border-left: 4px solid var(--c-med);
+  transition: var(--tr); cursor: pointer;
+  text-decoration: none; color: inherit;
+}
+.card-srv:hover {
+  box-shadow: var(--sh-md);
+  border-left-color: var(--c-ama);
+  transform: translateY(-3px);
+}
+.srv-ico   { font-size: 30px; }
+.srv-tit   { font-size: 15px; font-weight: 700; color: var(--c-osc); }
+.srv-desc  { font-size: 13px; color: var(--c-txts); line-height: 1.6; flex: 1; }
+.srv-arrow { font-size: 12px; color: var(--c-med); font-weight: 600; margin-top: 4px; }
+.card-srv:hover .srv-arrow { color: var(--c-osc); }
+
+/* Estado vacío Jinja2 */
+.estado-vacio {
+  text-align: center; padding: 48px 24px;
+  color: var(--c-txts); font-size: 14px;
+}
+.estado-vacio span { font-size: 36px; display: block; margin-bottom: 12px; }
+
+/* ================================================================
+   LOGIN — Patrón F corregido:
+   FORMULARIO a la IZQUIERDA (zona de máxima fijación),
+   CARRUSEL a la derecha (complemento visual institucional).
+   En móvil: carrusel arriba (identificación visual UCC),
+   formulario debajo (acción principal).
+   ================================================================ */
+.login-wrap {
+  min-height: calc(100vh - var(--hh));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 
-button {
-    padding: 10px 20px;
-    background: #3b6ea5;
-    color: white;
-    border: none;
+/* --- Columna IZQ: formulario (Patrón F: inicio del barrido) --- */
+.login-izq {
+  background: var(--c-bla);
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  padding: 48px 40px;
+}
+.login-box { width: 100%; max-width: 400px; }
+
+.login-ico {
+  width: 72px; height: 72px;
+  background: linear-gradient(135deg, var(--c-osc), var(--c-med));
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin-bottom: 24px;
+  box-shadow: var(--sh-sm);
+}
+.login-tit  { font-size: 28px; font-weight: 800; color: var(--c-osc); margin-bottom: 4px; }
+.login-sub  { font-size: 13px; color: var(--c-txts); margin-bottom: 32px; }
+
+/* Separador de sección */
+.login-sep {
+  height: 1px; background: var(--c-borde);
+  margin: 20px 0;
+}
+.login-footer-txt {
+  font-size: 11px; color: var(--c-txts); text-align: center; margin-top: 16px;
 }
 
-
-table {
-    margin: 50px auto;
-    border-collapse: collapse;
+/* --- Columna DER: carrusel + info institucional --- */
+.login-der {
+  background: var(--c-osc);
+  display: flex; flex-direction: column;
+  position: relative; overflow: hidden;
 }
 
-td, th {
-    border: 1px solid #ccc;
-    padding: 15px;
+/* Carrusel con fade */
+.car-wrap {
+  flex: 1; position: relative;
+  min-height: 240px; overflow: hidden;
+  background: linear-gradient(160deg, #1a3567, var(--c-med));
+}
+.car-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: 0; transition: opacity .9s ease;
+}
+.car-img.activa { opacity: 1; }
+.car-ovl {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, rgba(13,27,76,.2) 0%, rgba(13,27,76,.85) 100%);
+  z-index: 1;
+}
+/* Patrón geométrico cuando no hay imagen */
+.car-pattern {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(45deg, rgba(79,121,166,.15) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(79,121,166,.15) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(79,121,166,.10) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(79,121,166,.10) 75%);
+  background-size: 40px 40px;
+  z-index: 0;
+}
+.car-caption {
+  position: absolute; bottom: 20px; left: 20px; right: 20px;
+  z-index: 2; color: var(--c-bla);
+}
+.car-caption strong { font-size: 18px; display: block; margin-bottom: 4px; }
+.car-caption small  { font-size: 12px; color: var(--c-cla); }
+
+/* Indicadores carrusel */
+.car-dots {
+  position: absolute; bottom: 12px; right: 16px; z-index: 3;
+  display: flex; gap: 6px;
+}
+.car-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,.4); cursor: pointer;
+  transition: var(--tr);
+}
+.car-dot.activo { background: var(--c-ama); width: 18px; border-radius: 3px; }
+
+/* Mensajes institucionales (columna der, debajo del carrusel) */
+.info-inst {
+  padding: 24px 28px; color: var(--c-bla);
+}
+.info-blq { margin-bottom: 16px; }
+.info-blq h3 { color: var(--c-ama); font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.info-blq p  { color: var(--c-cla); font-size: 13px; line-height: 1.65; }
+.info-hr { height: 1px; background: rgba(79,121,166,.4); margin: 12px 0; }
+
+/* ── Responsive Login ── */
+@media (max-width: 860px) {
+  .login-wrap { grid-template-columns: 1fr; }
+  .login-der  { order: -1; }              /* carrusel arriba en móvil */
+  .car-wrap   { min-height: 180px; }
+  .info-inst  { display: none; }          /* se oculta en móvil */
+  .login-izq  { padding: 32px 20px; }
+  .login-box  { max-width: 100%; }
+
+  .info-movil {
+    background: var(--c-azfon);
+    padding: 16px 20px;
+    border-top: 3px solid var(--c-ama);
+  }
+  .info-movil p {
+    font-size: 12px; color: var(--c-txtm);
+    text-align: center; line-height: 1.6;
+  }
+}
+@media (min-width: 861px) {
+  .info-movil { display: none; }
 }
 
-
-.imagen-inferior {
-    width: 100%;
-    margin-top: 40px;
+/* ================================================================
+   ASIGNACION — Dashboard responsive con sidebar
+   ================================================================ */
+.app-wrap {
+  display: flex; height: calc(100vh - var(--hh));
+  overflow: hidden;
 }
 
-.imagen-inferior img {
-    width: 100%;
-    height: auto; 
-    display: block;
+.sidebar {
+  width: 260px; min-width: 260px;
+  background: var(--c-osc);
+  color: var(--c-bla);
+  display: flex; flex-direction: column;
+  padding: 20px; gap: 12px;
+  overflow-y: auto;
+  transition: transform .3s ease;
+  z-index: 200;
+}
+.sb-header {
+  text-align: center;
+  font-size: 13px; font-weight: 700;
+  border-bottom: 1px solid var(--c-med);
+  padding-bottom: 14px; margin-bottom: 4px;
+  color: var(--c-cla); letter-spacing: .04em;
+}
+.sb-info {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(79,121,166,.4);
+  border-radius: var(--r);
+  padding: 12px 14px; font-size: 13px;
+}
+.sb-info span { display: block; color: var(--c-cla); font-size: 11px; margin-bottom: 2px; }
+.sb-info strong { color: var(--c-bla); font-size: 14px; }
+
+.sb-nav { display: flex; flex-direction: column; gap: 6px; }
+.sb-btn {
+  background: rgba(255,255,255,.06);
+  color: var(--c-bla); border: none;
+  border-radius: var(--r); padding: 11px 14px;
+  font-size: 13px; text-align: left;
+  cursor: pointer; transition: var(--tr);
+  width: 100%;
+}
+.sb-btn:hover, .sb-btn.activo {
+  background: var(--c-med);
+}
+.btn-logout {
+  margin-top: auto;
+  background: rgba(192,57,43,.2);
+  color: #ff8a80; border: 1px solid rgba(192,57,43,.4);
+  border-radius: var(--r); padding: 11px 14px;
+  font-size: 13px; cursor: pointer; transition: var(--tr); width: 100%;
+}
+.btn-logout:hover { background: rgba(192,57,43,.35); }
+
+/* Área de contenido */
+.app-main { flex: 1; overflow-y: auto; background: var(--c-gris); }
+.app-panel { background: var(--c-bla); border-radius: var(--r-lg); box-shadow: var(--sh-sm);
+              padding: 24px; margin: 20px; }
+.app-panel h3 {
+  color: var(--c-osc); font-size: 17px; font-weight: 700;
+  margin-bottom: 18px; padding-bottom: 10px;
+  border-bottom: 2px solid var(--c-borde);
+}
+
+/* Tabla horario */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th {
+  background: var(--c-osc); color: var(--c-bla);
+  padding: 10px 8px; text-align: center; font-size: 12px;
+}
+.tbl td { border: 1px solid var(--c-borde); padding: 8px; text-align: center; min-width: 90px; }
+.tbl td.ocu { background: var(--c-azfon); }
+.tbl td.ocu strong { display: block; color: var(--c-osc); font-size: 12px; }
+.tbl td.ocu small  { color: var(--c-txts); font-size: 11px; }
+.tbl td.vac { color: var(--c-borde); }
+.tbl tr:hover td  { filter: brightness(.97); }
+.tbl-wrap { overflow-x: auto; }
+
+/* Tabla grupos */
+.tbl-g th { background: var(--c-med); }
+.tbl-g td { border-bottom: 1px solid var(--c-borde); border-left: none; border-right: none; }
+
+/* Inputs en formularios de asignación */
+.frm-fila { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+.frm-fila .campo { width: auto; min-width: 160px; }
+.frm-fila .btn-p { width: auto; }
+
+/* Hamburger móvil */
+.btn-ham {
+  display: none;
+  position: fixed; top: calc(var(--hh) + 12px); left: 12px; z-index: 500;
+  background: var(--c-osc); color: var(--c-ama);
+  border: none; border-radius: var(--r);
+  width: 42px; height: 42px; font-size: 18px;
+  box-shadow: var(--sh-md);
+  align-items: center; justify-content: center;
+}
+.overlay-sb {
+  display: none;
+  position: fixed; inset: 0; z-index: 150;
+  background: rgba(13,27,76,.5);
+}
+
+/* Cargando */
+.cargando { text-align: center; padding: 40px; color: var(--c-txts); font-size: 14px; }
+.cargando::before { content: '⏳ '; }
+
+@media (max-width: 1024px) {
+  .btn-ham { display: flex; }
+  .sidebar {
+    position: fixed; left: -260px; top: var(--hh);
+    height: calc(100% - var(--hh));
+  }
+  .sidebar.abierta { left: 0; box-shadow: var(--sh-lg); }
+  .overlay-sb.visible { display: block; }
+  .app-main { margin-left: 0 !important; }
+  .app-panel { margin: 12px; }
+}
+@media (max-width: 600px) {
+  .frm-fila { flex-direction: column; }
+  .frm-fila .campo { width: 100%; }
+  .frm-fila .btn-p { width: 100%; }
 }

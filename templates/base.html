@@ -1,0 +1,144 @@
+{#
+  PATRÓN: Template Method (GoF — Creacional/Comportamental)
+  base.html define el "esqueleto" de TODAS las páginas:
+    - header institucional
+    - bloque de contenido (abstract → lo rellenan las subpáginas)
+    - footer real HTML/CSS
+
+  Principio OCP (SOLID):
+    - base.html está CERRADO a modificaciones.
+    - ABIERTO a extensión: cada página agrega contenido via {% block %}.
+
+  Principio ISP (SOLID):
+    - Cada {% block %} es una interfaz pequeña y específica.
+    - head_extra → solo CSS adicional
+    - contenido   → solo el cuerpo de la página
+    - scripts     → solo JavaScript al final del body
+#}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0d1b4c">
+  <title>{% block titulo %}Sistema de Asignación{% endblock %} · Universidad Católica de Colombia</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+  {# ISP: head_extra permite que cada página agregue sus propios estilos sin tocar base #}
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="{{ body_class | default('') }}">
+
+{#
+  OCP: El header está CERRADO. Ninguna página modifica este bloque;
+  simplemente lo hereda. Si se necesita nav extra, se usa nav_extra.
+#}
+{% block header %}
+<header class="header-ucc" role="banner">
+  <div class="header-inner">
+
+    {# Patrón F — Zona superior izquierda: logo (máxima fijación visual) #}
+    <a href="/" class="logo-link" aria-label="Universidad Católica de Colombia — Inicio">
+      <div class="logo-escudo" aria-hidden="true">✝</div>
+      <div class="logo-texto">
+        <span class="logo-n">Universidad Católica de Colombia</span>
+        <span class="logo-s">Sistema de Asignación de Salones</span>
+      </div>
+    </a>
+
+    <nav class="nav-superior" aria-label="Navegación principal">
+      {% block nav_extra %}{% endblock %}
+      <div class="nav-chip">
+        <strong>Sede Las Torres</strong>
+        Av. Caracas # 46-72, Bogotá
+      </div>
+    </nav>
+
+  </div>
+</header>
+{% endblock %}
+
+{# DIP (SOLID): las páginas dependen de este bloque abstracto,
+   no de implementaciones concretas del main. #}
+<main class="main-cnt" role="main">
+  {% block contenido %}{% endblock %}
+</main>
+
+{#
+  OCP: Footer real (código HTML/CSS, no imagen).
+  Se hereda automáticamente en TODAS las páginas.
+  Datos dinámicos: {{ anio }} viene del contexto de FastAPI.
+  Filtro Jinja2: | default() para valor de reserva.
+#}
+{% block footer %}
+<footer class="footer-ucc" role="contentinfo">
+  <div class="footer-inner">
+
+    {# Columna 1: Identidad institucional #}
+    <div class="footer-col">
+      <div class="footer-logo-min">
+        <div class="footer-esc" aria-hidden="true">✝</div>
+        <div>
+          <strong>Universidad Católica de Colombia</strong>
+          <small>Vigilada Mineducación</small>
+        </div>
+      </div>
+      <p class="footer-legal">
+        Institución de Educación Superior reconocida mediante Resolución N.º 2271
+        del 7 de julio de 1970, Ministerio de Justicia.
+      </p>
+      <div class="footer-social" aria-label="Redes sociales">
+        <a href="https://www.facebook.com/UCatolica.co" target="_blank" rel="noopener" aria-label="Facebook">f</a>
+        <a href="https://twitter.com/UCatolicaCo"       target="_blank" rel="noopener" aria-label="Twitter">𝕏</a>
+        <a href="https://www.youtube.com/UCatolica"     target="_blank" rel="noopener" aria-label="YouTube">▶</a>
+        <a href="https://www.instagram.com/ucatolica.co" target="_blank" rel="noopener" aria-label="Instagram">◎</a>
+        <a href="https://www.linkedin.com/school/universidad-católica-de-colombia/" target="_blank" rel="noopener" aria-label="LinkedIn">in</a>
+      </div>
+    </div>
+
+    {# Columna 2: Contacto y sedes #}
+    <div class="footer-col">
+      <h4>Contacto y Sedes</h4>
+      <p>📞 +57 (601) 4 43 37 00</p>
+      <p>📍 Sede Las Torres — Av. Caracas # 46-72</p>
+      <p>📍 Sede 4 — Carrera 13 # 47-30</p>
+      <p>📍 Sede El Claustro — Diagonal 46A # 15B-10</p>
+      <p>✉️ <a href="mailto:notificacionjudicial@ucatolica.edu.co" class="footer-link">
+        notificacionjudicial@ucatolica.edu.co
+      </a></p>
+    </div>
+
+    {# Columna 3: Sistema #}
+    <div class="footer-col">
+      <h4>Sistema de Asignación</h4>
+      <p>Módulo de gestión académica de espacios físicos con optimización genética.</p>
+      <br>
+      <a href="/login" class="footer-link">→ Acceder al sistema</a><br><br>
+      <a href="https://portalweb.ucatolica.edu.co/paw/" target="_blank" class="footer-link">→ PAW 2.0</a><br>
+      <a href="https://newava.ucatolica.edu.co"          target="_blank" class="footer-link">→ Campus AVA</a>
+    </div>
+
+    {# Columna 4: Copyright — Jinja2: {{ anio }} viene del contexto FastAPI #}
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <p>© {{ anio | default(2026) }} Universidad Católica de Colombia</p>
+      <p>Todos los derechos reservados.</p>
+      <br>
+      <p><a href="https://www.ucatolica.edu.co" target="_blank" class="footer-link">www.ucatolica.edu.co</a></p>
+    </div>
+
+  </div>
+  <div class="footer-base">
+    <span class="footer-copy">
+      © {{ anio | default(2026) }} Universidad Católica de Colombia · Sistema de Asignación de Salones
+    </span>
+    <span class="footer-copy">
+      Desarrollado por Ingeniería de Sistemas
+    </span>
+  </div>
+</footer>
+{% endblock %}
+
+{# ISP: bloque de scripts aislado al final del body #}
+{% block scripts %}{% endblock %}
+</body>
+</html>
