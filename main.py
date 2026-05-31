@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from sqlmodel import Session, select
 from database import CrearTa, ConexionBD
-from modelos.entidades import ConfigFront, SesionToken
+from modelos.entidades import ConfigFront, SesionToken, Rol
 from servicios.sesiones import GestorSesion
 from controladores import configCtrl, usuarioCtrl, horarioCtrl, inscripcionCtrl, salonCtrl, adminCtrl
 
@@ -61,7 +61,18 @@ def _obtener_config(session: Session):
 
 @app.on_event("startup")
 def IniciarApp():
-    CrearTa()
+    CrearTa() # Esto crea las tablas
+    
+    # --- SEEDER DE ROLES ---
+    with Session(ConexionBD.ObtenerMotor()) as session:
+        roles_necesarios = ["Estudiante", "Profesor", "Administrador"]
+        for nombre in roles_necesarios:
+            # Buscamos si el rol ya existe
+            rol_db = session.exec(select(Rol).where(Rol.nombre_rol == nombre)).first()
+            if not rol_db:
+                # Si no existe, lo insertamos
+                session.add(Rol(nombre_rol=nombre))
+        session.commit()
 
 
 # ── SERVICIOS para el index (pasados a Jinja2 como contexto) ──
@@ -104,7 +115,9 @@ def PaginaIn(request: Request):
     ctx["servicios"] = SERVICIOS_INDEX
     with Session(ConexionBD.ObtenerMotor()) as ses:
         ctx["config"] = _obtener_config(ses)
-    return templates.TemplateResponse("index.html", ctx)
+        
+    # 👇 CAMBIA ESTA LÍNEA
+    return templates.TemplateResponse(request=request, name="index.html", context=ctx)
 
 
 @app.get("/index")
@@ -120,7 +133,9 @@ def favicon():
 @app.get("/login")
 def PaginaLog(request: Request):
     ctx = _ctx_base(request)
-    return templates.TemplateResponse("login.html", ctx)
+    
+    # 👇 CAMBIA ESTA LÍNEA
+    return templates.TemplateResponse(request=request, name="login.html", context=ctx)
 
 
 @app.get("/sesion/{token}")
@@ -131,7 +146,9 @@ def PaginaSesion(token: str, request: Request):
             return RedirectResponse(url="/login")
     ctx = _ctx_base(request)
     ctx.update({"token": token, "rol": sesion.rol, "codigo": sesion.codigo_usuario})
-    return templates.TemplateResponse("asignacion.html", ctx)
+    
+    # 👇 CAMBIA ESTA LÍNEA
+    return templates.TemplateResponse(request=request, name="asignacion.html", context=ctx)
 
 
 @app.get("/asignacion")
