@@ -1,13 +1,40 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select, func
 from database import ObtenerSes
-from modelos.entidades import Usuario, Estudiante, Materia, Salon, Grupo, Inscripcion, Profesor, SesionToken
+from modelos.entidades import (
+    Usuario, Estudiante, Materia, Salon, Grupo,
+    Inscripcion, Profesor, SesionToken
+)
 from modelos.esquemas import EsquemaMatric
 from servicios.eventos import ContextoIns, EstrategiaVac
 from servicios.fabricas import ConstructorGrup
 from servicios.sesiones import ObtenerSesAct
 
 router = APIRouter()
+
+
+@router.get("/materias", status_code=200)
+def ListarMaterias(
+    sesion: SesionToken = Depends(ObtenerSesAct),
+    session: Session = Depends(ObtenerSes)
+):
+    """Lista las 20 materias del pensum con semestre y prerequisito."""
+    materias = session.exec(select(Materia)).all()
+    resultado = []
+    for m in materias:
+        prereq = None
+        if m.id_prerequisito:
+            pm = session.get(Materia, m.id_prerequisito)
+            prereq = pm.nombre if pm else None
+        resultado.append({
+            "id":            m.id,
+            "nombre":        m.nombre,
+            "creditos":      m.creditos,
+            "facultad":      m.facultad,
+            "semestre":      m.semestre,
+            "prerequisito":  prereq
+        })
+    return resultado
 
 
 @router.get("/materias/{id_materia}/grupos", status_code=200)
@@ -20,8 +47,8 @@ def ObtenerGrup(
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada.")
 
-    grupos  = session.exec(select(Grupo).where(Grupo.id_materia == id_materia)).all()
-    limite  = 30 if materia.facultad == "Sistemas" else 35
+    grupos = session.exec(select(Grupo).where(Grupo.id_materia == id_materia)).all()
+    limite = 30 if materia.facultad == "Sistemas" else 35
 
     return [
         {
@@ -54,22 +81,55 @@ def InscribirEst(
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada.")
 
+    # ── Validacion 1: semestre del estudiante vs semestre de la materia ──
+    if est.semestre < materia.semestre:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"No puedes inscribir materias de semestre {materia.semestre}. "
+                f"Tu semestre actual es {est.semestre}. "
+                f"Habla con el administrador para actualizar tu semestre."
+            )
+        )
+
+    # ── Validacion 2: prerequisito de Ciencias Basicas ──
+    if materia.id_prerequisito:
+        prereq_mat = session.get(Materia, materia.id_prerequisito)
+        prereq_insc = session.exec(
+            select(Inscripcion).where(
+                Inscripcion.id_estudiante == est.id,
+                Inscripcion.id_materia    == materia.id_prerequisito,
+                Inscripcion.aprobada      == True
+            )
+        ).first()
+        if not prereq_insc:
+            nombre_pre = prereq_mat.nombre if prereq_mat else f"ID {materia.id_prerequisito}"
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Prerequisito no cumplido: debes aprobar '{nombre_pre}' "
+                    f"antes de inscribir '{materia.nombre}'."
+                )
+            )
+
+    # ── Validacion 3: no duplicar inscripcion ──
     if session.exec(
         select(Inscripcion).where(
             Inscripcion.id_estudiante == est.id,
-            Inscripcion.id_materia == data.id_materia
+            Inscripcion.id_materia    == data.id_materia
         )
     ).first():
-        raise HTTPException(status_code=409, detail="Ya estás matriculado en esta materia.")
+        raise HTTPException(status_code=409, detail="Ya estas matriculado en esta materia.")
 
+    # ── Asignacion de profesor ──
     especReq   = "Ingeniería de Sistemas" if materia.facultad == "Sistemas" else "Ciencias Básicas"
     profesorAs = session.exec(select(Profesor).where(Profesor.especialidad == especReq)).first()
     if not profesorAs:
         raise HTTPException(status_code=400, detail="No hay profesores con la especialidad requerida.")
 
-    grupos   = session.exec(select(Grupo).where(Grupo.id_materia == data.id_materia)).all()
-    limiteC  = 30 if materia.facultad == "Sistemas" else 35
-    prefSal  = "Sala de Computo%" if materia.facultad == "Sistemas" else "AULA-%"
+    grupos  = session.exec(select(Grupo).where(Grupo.id_materia == data.id_materia)).all()
+    limiteC = 30 if materia.facultad == "Sistemas" else 35
+    prefSal = "Sala de Computo%" if materia.facultad == "Sistemas" else "AULA-%"
 
     if not grupos:
         sal = session.exec(select(Salon).where(Salon.nombre.like(prefSal))).first()
@@ -87,7 +147,7 @@ def InscribirEst(
         if data.id_grupo:
             grupoEleg = session.get(Grupo, data.id_grupo)
             if not grupoEleg or grupoEleg.id_materia != data.id_materia:
-                raise HTTPException(status_code=400, detail="El grupo seleccionado no es válido para esta materia.")
+                raise HTTPException(status_code=400, detail="El grupo seleccionado no es valido para esta materia.")
         else:
             grupoEleg = ContextoIns(EstrategiaVac()).seleccionar(list(grupos), session)
         inscritos = session.exec(
@@ -124,10 +184,41 @@ def InscribirEst(
             estIns.id_grupo = nuevoGrup.id
             session.add(estIns)
 
-        session.add(Inscripcion(id_estudiante=est.id, id_materia=data.id_materia, id_grupo=nuevoGrup.id, estado="Activo"))
+        session.add(Inscripcion(
+            id_estudiante=est.id, id_materia=data.id_materia,
+            id_grupo=nuevoGrup.id, estado="Activo", aprobada=None
+        ))
         session.commit()
-        return {"alerta": False, "mensaje": f"Matrícula exitosa. Se aperturó la sección {nuevoGrup.num_grupo}."}
+        return {"alerta": False, "mensaje": f"Matricula exitosa. Se aperturo la seccion {nuevoGrup.num_grupo}."}
 
-    session.add(Inscripcion(id_estudiante=est.id, id_materia=data.id_materia, id_grupo=grupoEleg.id, estado="Activo"))
+    session.add(Inscripcion(
+        id_estudiante=est.id, id_materia=data.id_materia,
+        id_grupo=grupoEleg.id, estado="Activo", aprobada=None
+    ))
     session.commit()
-    return {"alerta": False, "mensaje": f"Matrícula exitosa en el Grupo {grupoEleg.num_grupo}."}
+    return {"alerta": False, "mensaje": f"Matricula exitosa en el Grupo {grupoEleg.num_grupo}."}
+
+
+@router.put("/inscripcion/{id_inscripcion}/estado", status_code=200)
+def ActualizarEstado(
+    id_inscripcion: int,
+    aprobada: bool,
+    sesion: SesionToken = Depends(ObtenerSesAct),
+    session: Session = Depends(ObtenerSes)
+):
+    """
+    Profesor o Admin marca una inscripcion como aprobada (True) o reprobada (False).
+    Esto activa el sistema de prerequisitos para la siguiente materia de la cadena.
+    """
+    if sesion.rol not in ["Profesor", "Administrador"]:
+        raise HTTPException(status_code=403, detail="Solo profesores y administradores pueden actualizar el estado.")
+
+    insc = session.get(Inscripcion, id_inscripcion)
+    if not insc:
+        raise HTTPException(status_code=404, detail="Inscripcion no encontrada.")
+
+    insc.aprobada = aprobada
+    insc.estado   = "Aprobado" if aprobada else "Reprobado"
+    session.add(insc)
+    session.commit()
+    return {"mensaje": f"Estado actualizado: {'Aprobado' if aprobada else 'Reprobado'}."}

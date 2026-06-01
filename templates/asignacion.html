@@ -1,78 +1,64 @@
-{#
-  PATRÓN: Template Method — asignacion.html extiende base.html
-  pero reemplaza header y footer para lograr el layout de dashboard.
-  SRP: esta plantilla gestiona exclusivamente la vista del dashboard.
-  OCP: el comportamiento de cada rol se inyecta desde JavaScript
-       sin modificar el HTML base.
-#}
 {% extends "base.html" %}
-
-{% block titulo %}Dashboard — {{ rol | default('Usuario') }}{% endblock %}
-
-{# Para el dashboard no mostramos el header institucional:
-   la sidebar cumple esa función de navegación. #}
+{% block titulo %}Dashboard &mdash; {{ rol | default('Usuario') }}{% endblock %}
 {% block header %}{% endblock %}
 {% block footer %}{% endblock %}
 
 {% block contenido %}
 
-{# ── Botón hamburger: visible solo en móvil ── #}
-<button class="btn-ham" onclick="toggleSidebar()" aria-label="Abrir menú">☰</button>
+<button class="btn-ham" onclick="toggleSidebar()" aria-label="Abrir menu">&#9776;</button>
 <div class="overlay-sb" id="overlay" onclick="toggleSidebar()"></div>
 
 <div class="app-wrap">
 
-  {# ══════════════════════════════════
-     SIDEBAR — Patrón F: columna izquierda
-     (zona vertical de descenso visual)
-     ══════════════════════════════════ #}
-  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Menú principal del sistema">
+  <!-- Sidebar: Patron F — columna izquierda (descenso visual) -->
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Menu principal">
 
-    <div class="sb-header">🎓 U. Católica de Colombia</div>
+    <div class="sb-header">U. Catolica de Colombia</div>
 
-    {# Información del usuario autenticado.
-       Jinja2 — variables del contexto de FastAPI: rol, codigo #}
     <div class="sb-info">
-      <span>Código institucional</span>
-      <strong>{{ codigo | default('—') }}</strong>
+      <span>Codigo institucional</span>
+      <strong>{{ codigo | default('---') }}</strong>
       <span style="margin-top:8px;">Rol</span>
       <strong style="color:var(--c-ama);">{{ rol | default('Sin rol') }}</strong>
     </div>
 
-    <nav class="sb-nav" id="nav-sb">
-      <button class="sb-btn activo" onclick="mostrarSeccion('horario', this)">
-        📅 Mi Horario
-      </button>
+    <nav class="sb-nav">
+      {# Patron F + OCP: cada rol ve solo sus opciones. Horario NO para Admin. #}
+      {% if rol != 'Administrador' %}
+        <button id="sb-hor" class="sb-btn" onclick="mostrarSeccion('horario', this)">
+          📅 Mi Horario
+        </button>
+      {% endif %}
 
-      {# Jinja2 — Condicional por rol: cada rol ve solo sus opciones. #}
       {% if rol == 'Estudiante' %}
         <button class="sb-btn" onclick="mostrarSeccion('inscribir', this)">
-          📝 Inscribir Materia
+          Inscribir Materia
+        </button>
+        <button class="sb-btn" onclick="mostrarSeccion('materias', this)">
+          Ver Materias
         </button>
       {% elif rol == 'Profesor' %}
         <button class="sb-btn" onclick="mostrarSeccion('salones', this)">
-          🏫 Cambiar Salón
+          Cambiar Salon
+        </button>
+        <button class="sb-btn" onclick="mostrarSeccion('calificar', this)">
+          Calificar Inscripcion
         </button>
       {% elif rol == 'Administrador' %}
-        <button class="sb-btn" onclick="mostrarSeccion('optimizar', this)">
-          🤖 Optimizar Horarios
+        <button id="sb-opt" class="sb-btn" onclick="mostrarSeccion('optimizar', this)">
+          Optimizar Horarios
         </button>
         <button class="sb-btn" onclick="mostrarSeccion('config', this)">
-          ⚙️ Configurar Página
+          Configurar Pagina
         </button>
       {% endif %}
     </nav>
 
-    <button class="btn-logout" onclick="cerrarSesion()">🔒 Cerrar Sesión</button>
-
+    <button class="btn-logout" onclick="cerrarSesion()">Cerrar Sesion</button>
   </aside>
 
-  {# ══════════════════════════════════
-     ÁREA DE CONTENIDO DINÁMICO
-     Se rellena por JavaScript según la sección activa.
-     ══════════════════════════════════ #}
   <div class="app-main" id="contenido-app">
-    <div class="cargando">Cargando información...</div>
+    <div class="cargando">Cargando informacion...</div>
   </div>
 
 </div>
@@ -80,14 +66,6 @@
 
 {% block scripts %}
 <script>
-  /* ─────────────────────────────────────────────────────
-     SRP: cada función tiene una sola responsabilidad.
-     DIP: las funciones dependen de `apiGet`/`apiPost`
-          (abstracciones), no de fetch() directamente.
-     OCP: agregar una sección nueva es agregar un
-          render*() sin modificar los existentes.
-     ───────────────────────────────────────────────────── */
-
   const TOKEN  = "{{ token }}";
   const ROL    = "{{ rol }}";
   const CODIGO = "{{ codigo }}";
@@ -99,24 +77,34 @@
     document.getElementById('overlay').classList.toggle('visible');
   }
 
-  /* ── Navegación ── */
+  /* ── Navegacion (OCP: agregar seccion = agregar funcion, sin modificar este bloque) ── */
   function mostrarSeccion(sec, btn) {
     document.querySelectorAll('.sb-btn').forEach(b => b.classList.remove('activo'));
     if (btn) btn.classList.add('activo');
-    if (window.innerWidth <= 1024) toggleSidebar();  /* cierra en móvil al navegar */
+    if (window.innerWidth <= 1024) toggleSidebar();
+
     const mapa = {
       horario:   renderHorario,
       inscribir: renderInscribir,
+      materias:  renderMaterias,
       salones:   renderSalones,
+      calificar: renderCalificar,
       optimizar: renderOptimizar,
       config:    renderConfig
     };
     if (mapa[sec]) mapa[sec]();
   }
 
-  document.addEventListener('DOMContentLoaded', () => mostrarSeccion('horario'));
+  document.addEventListener('DOMContentLoaded', () => {
+    // Admin inicia en Optimizar (no tiene horario)
+    if (ROL === 'Administrador') {
+      mostrarSeccion('optimizar', document.getElementById('sb-opt'));
+    } else {
+      mostrarSeccion('horario', document.getElementById('sb-hor'));
+    }
+  });
 
-  /* ── Abstracciones HTTP (DIP) ── */
+  /* ── HTTP abstractions (DIP) ── */
   async function apiGet(url) {
     const r = await fetch(`${API}${url}?token=${TOKEN}`);
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || 'Error del servidor.'); }
@@ -138,28 +126,24 @@
     return d;
   }
 
-  /* ── Helpers de UI ── */
+  /* ── Helpers UI (SRP) ── */
   function contenido(html) { document.getElementById('contenido-app').innerHTML = html; }
-  function panel(titulo, html) {
-    return `<div class="app-panel"><h3>${titulo}</h3>${html}</div>`;
-  }
+  function panel(titulo, html) { return `<div class="app-panel"><h3>${titulo}</h3>${html}</div>`; }
   function alertaHtml(tipo, msg) {
-    return `<div class="alerta ${tipo}">${tipo==='err'?'⚠️':'✅'} ${msg}</div>`;
+    return `<div class="alerta ${tipo}">${msg}</div>`;
   }
 
-  /* ════════════════════════════════════════════
-     SECCIÓN: HORARIO
-     ════════════════════════════════════════════ */
+  /* ══ HORARIO (solo Estudiante y Profesor) ════════════════════════ */
   async function renderHorario() {
     contenido(`<div class="cargando">Cargando horario...</div>`);
     try {
-      const h    = await apiGet('/horarios');
-      const dias  = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+      const h   = await apiGet('/horarios');
+      const dias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
       const horas = Object.keys(h).sort();
 
       if (!horas.length) {
         contenido(panel('📅 Mi Horario',
-          `<div class="estado-vacio"><span>📋</span>No hay clases asignadas actualmente.</div>`
+          `<div class="estado-vacio"><span>📋</span>No tienes clases asignadas actualmente.</div>`
         ));
         return;
       }
@@ -169,7 +153,7 @@
           const cl = h[hr]?.[dia];
           return cl
             ? `<td class="ocu"><strong>${cl.materia}</strong><br><small>${cl.salon}</small><br><small>${cl.info_extra}</small></td>`
-            : `<td class="vac">—</td>`;
+            : `<td class="vac">-</td>`;
         }).join('');
         return `<tr><td><strong>${hr}</strong></td>${celdas}</tr>`;
       }).join('');
@@ -187,15 +171,43 @@
     }
   }
 
-  /* ════════════════════════════════════════════
-     SECCIÓN: INSCRIBIR (Estudiante)
-     ════════════════════════════════════════════ */
+  /* ══ MATERIAS (catalogo para Estudiante) ════════════════════════ */
+  async function renderMaterias() {
+    contenido(`<div class="cargando">Cargando catalogo...</div>`);
+    try {
+      const ms = await apiGet('/materias');
+      const filas = ms.map(m => `
+        <tr>
+          <td>${m.id}</td>
+          <td><strong>${m.nombre}</strong></td>
+          <td>${m.facultad}</td>
+          <td>Semestre ${m.semestre}</td>
+          <td>${m.creditos}</td>
+          <td>${m.prerequisito ? m.prerequisito : '-'}</td>
+        </tr>`).join('');
+      contenido(panel('Catalogo de Materias (Primeros 3 Semestres)',
+        `<div class="tbl-wrap">
+          <table class="tbl tbl-g">
+            <thead><tr><th>ID</th><th>Materia</th><th>Facultad</th><th>Semestre</th><th>Creditos</th><th>Prerequisito</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>`
+      ));
+    } catch(e) {
+      contenido(panel('Catalogo', alertaHtml('err', e.message)));
+    }
+  }
+
+  /* ══ INSCRIBIR (Estudiante) ════════════════════════════════════= */
   function renderInscribir() {
-    contenido(panel('📝 Inscribir Materia',
+    contenido(panel('Inscribir Materia',
       `<div id="ae" class="alerta"></div>
        <div id="ao" class="alerta"></div>
+       <p style="font-size:12px;color:var(--c-txts);margin-bottom:12px;">
+         Usa el boton "Ver Materias" para ver los IDs disponibles con sus prerequisitos y semestres.
+       </p>
        <div class="frm-fila">
-         <input type="number" id="id-mat" class="campo" placeholder="ID de la materia (ej: 1)" min="1">
+         <input type="number" id="id-mat" class="campo" placeholder="ID de la materia" min="1">
          <button class="btn-p" onclick="buscarGrupos()" style="width:auto;">Buscar Grupos</button>
        </div>
        <div id="grupos-res"></div>`
@@ -208,34 +220,34 @@
     const ae  = document.getElementById('ae');
     ae.className = 'alerta';
     if (!idM || idM < 1) {
-      ae.className = 'alerta err'; ae.innerHTML = '⚠️ Ingrese un ID de materia válido.'; return;
+      ae.className = 'alerta err'; ae.innerText = 'Ingrese un ID de materia valido.'; return;
     }
     res.innerHTML = `<div class="cargando">Buscando grupos...</div>`;
     try {
       const gs = await apiGet(`/materias/${idM}/grupos`);
       if (!gs.length) {
-        res.innerHTML = `<p style="color:var(--c-txts);margin-top:12px;">Sin grupos existentes. Se creará uno al inscribirse.</p>
-          <button class="btn-ok" style="margin-top:10px;" onclick="inscribirse(${idM},null)">Inscribirse (grupo automático)</button>`;
+        res.innerHTML = `<p style="color:var(--c-txts);margin-top:12px;">Sin grupos existentes. Se creara uno al inscribirse.</p>
+          <button class="btn-ok" style="margin-top:10px;" onclick="inscribirse(${idM},null)">Inscribirse (grupo automatico)</button>`;
         return;
       }
       const filas = gs.map(g => `
         <tr>
           <td>Grupo ${g.num_grupo}</td>
-          <td>${g.dia||'—'}</td><td>${g.hora||'—'}</td>
+          <td>${g.dia||'-'}</td><td>${g.hora||'-'}</td>
           <td><span class="badge ${g.inscritos<g.limite?'badge-ok':'badge-err'}">${g.inscritos}/${g.limite}</span></td>
           <td><button class="btn-ok" onclick="inscribirse(${idM},${g.id_grupo})">Elegir</button></td>
         </tr>`).join('');
       res.innerHTML = `
         <div class="tbl-wrap" style="margin-top:12px;">
           <table class="tbl tbl-g">
-            <thead><tr><th>Grupo</th><th>Día</th><th>Hora</th><th>Cupo</th><th>Acción</th></tr></thead>
+            <thead><tr><th>Grupo</th><th>Dia</th><th>Hora</th><th>Cupo</th><th>Accion</th></tr></thead>
             <tbody>${filas}</tbody>
           </table>
         </div>
-        <button class="btn-s" style="margin-top:12px;" onclick="inscribirse(${idM},null)">Asignar automáticamente</button>`;
+        <button class="btn-s" style="margin-top:12px;" onclick="inscribirse(${idM},null)">Asignar automaticamente</button>`;
     } catch(e) {
       res.innerHTML = '';
-      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
+      ae.className = 'alerta err'; ae.innerText = e.message;
     }
   }
 
@@ -245,22 +257,20 @@
     ae.className = ao.className = 'alerta';
     try {
       const r = await apiPost('/inscribir', { id_materia: idMat, id_grupo: idGrupo });
-      ao.className = 'alerta ok'; ao.innerHTML = '✅ ' + r.mensaje;
+      ao.className = 'alerta ok'; ao.innerText = r.mensaje;
       document.getElementById('grupos-res').innerHTML = '';
     } catch(e) {
-      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
+      ae.className = 'alerta err'; ae.innerText = e.message;
     }
   }
 
-  /* ════════════════════════════════════════════
-     SECCIÓN: SALONES (Profesor)
-     ════════════════════════════════════════════ */
+  /* ══ CAMBIAR SALON (Profesor) ════════════════════════════════════ */
   function renderSalones() {
-    contenido(panel('🏫 Cambiar Salón de Grupo',
+    contenido(panel('Cambiar Salon de Grupo',
       `<div id="ae" class="alerta"></div>
        <div id="ao" class="alerta"></div>
        <div class="frm-fila">
-         <input type="number" id="id-grp" class="campo" placeholder="ID del grupo (ej: 1)" min="1">
+         <input type="number" id="id-grp" class="campo" placeholder="ID del grupo" min="1">
          <button class="btn-p" onclick="buscarSalones()" style="width:auto;">Ver Salones Disponibles</button>
        </div>
        <div id="salones-res"></div>`
@@ -273,7 +283,7 @@
     const ae  = document.getElementById('ae');
     ae.className = 'alerta';
     if (!idG || idG < 1) {
-      ae.className = 'alerta err'; ae.innerHTML = '⚠️ Ingrese un ID de grupo válido.'; return;
+      ae.className = 'alerta err'; ae.innerText = 'Ingrese un ID de grupo valido.'; return;
     }
     res.innerHTML = `<div class="cargando">Buscando salones...</div>`;
     try {
@@ -288,13 +298,13 @@
       res.innerHTML = `
         <div class="tbl-wrap" style="margin-top:12px;">
           <table class="tbl tbl-g">
-            <thead><tr><th>Salón</th><th>Capacidad</th><th>Acción</th></tr></thead>
+            <thead><tr><th>Salon</th><th>Capacidad</th><th>Accion</th></tr></thead>
             <tbody>${filas}</tbody>
           </table>
         </div>`;
     } catch(e) {
       res.innerHTML = '';
-      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
+      ae.className = 'alerta err'; ae.innerText = e.message;
     }
   }
 
@@ -304,26 +314,59 @@
     ae.className = ao.className = 'alerta';
     try {
       const r = await apiPut(`/profesor/cambiar-salon?id_grupo=${idG}&id_nuevo_salon=${idS}`);
-      ao.className = 'alerta ok'; ao.innerHTML = '✅ ' + r.mensaje;
+      ao.className = 'alerta ok'; ao.innerText = r.mensaje;
       document.getElementById('salones-res').innerHTML = '';
     } catch(e) {
-      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
+      ae.className = 'alerta err'; ae.innerText = e.message;
     }
   }
 
-  /* ════════════════════════════════════════════
-     SECCIÓN: OPTIMIZAR (Admin)
-     ════════════════════════════════════════════ */
+  /* ══ CALIFICAR INSCRIPCION (Profesor) ════════════════════════════ */
+  function renderCalificar() {
+    contenido(panel('Calificar Inscripcion',
+      `<div id="ae" class="alerta"></div>
+       <div id="ao" class="alerta"></div>
+       <p style="font-size:12px;color:var(--c-txts);margin-bottom:12px;">
+         Actualiza el estado de una inscripcion. El ID de inscripcion lo puedes consultar en la base de datos.
+         Aprobar una materia activa los prerequisitos para las siguientes de la cadena.
+       </p>
+       <div class="frm-fila">
+         <input type="number" id="id-insc" class="campo" placeholder="ID de la inscripcion" min="1">
+       </div>
+       <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
+         <button class="btn-ok" onclick="calificar(true)" style="flex:1;">Marcar como Aprobado</button>
+         <button class="btn-err" onclick="calificar(false)" style="flex:1;">Marcar como Reprobado</button>
+       </div>`
+    ));
+  }
+
+  async function calificar(aprobada) {
+    const idI = parseInt(document.getElementById('id-insc').value);
+    const ae  = document.getElementById('ae');
+    const ao  = document.getElementById('ao');
+    ae.className = ao.className = 'alerta';
+    if (!idI || idI < 1) {
+      ae.className = 'alerta err'; ae.innerText = 'Ingrese un ID de inscripcion valido.'; return;
+    }
+    try {
+      const r = await apiPut(`/inscripcion/${idI}/estado?aprobada=${aprobada}`);
+      ao.className = 'alerta ok'; ao.innerText = r.mensaje;
+    } catch(e) {
+      ae.className = 'alerta err'; ae.innerText = e.message;
+    }
+  }
+
+  /* ══ OPTIMIZAR (Admin) ════════════════════════════════════════════ */
   function renderOptimizar() {
-    contenido(panel('🤖 Optimización Genética',
+    contenido(panel('Optimizacion Genetica de Horarios',
       `<p style="font-size:13px;color:var(--c-txts);margin-bottom:20px;line-height:1.7;">
-         Ejecuta el algoritmo genético para reasignar salones minimizando cruces
-         y respetando capacidades. Puede tardar unos segundos.
+         Ejecuta el algoritmo genetico para reasignar salones minimizando cruces
+         y respetando capacidades. Puede tardar varios segundos.
        </p>
        <div id="ae" class="alerta"></div>
        <div id="ao" class="alerta"></div>
-       <button class="btn-ok" id="btn-opt" onclick="ejecutarOpt()" style="padding:12px 24px;font-size:14px;">
-         ▶ Ejecutar Optimización
+       <button class="btn-ok" id="btn-opt" onclick="ejecutarOpt()" style="padding:12px 24px;">
+         Ejecutar Optimizacion
        </button>`
     ));
   }
@@ -333,48 +376,81 @@
     const ao = document.getElementById('ao');
     const btn = document.getElementById('btn-opt');
     ae.className = ao.className = 'alerta';
-    btn.disabled = true; btn.innerText = '⏳ Procesando...';
+    btn.disabled = true; btn.innerText = 'Procesando...';
     try {
       const r = await apiPost('/admin/optimizar-horarios', {});
-      ao.className = 'alerta ok'; ao.innerHTML = '✅ ' + (r.mensaje || JSON.stringify(r));
+      ao.className = 'alerta ok'; ao.innerText = r.mensaje || JSON.stringify(r);
     } catch(e) {
-      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
+      ae.className = 'alerta err'; ae.innerText = e.message;
     } finally {
-      btn.disabled = false; btn.innerText = '▶ Ejecutar Optimización';
+      btn.disabled = false; btn.innerText = 'Ejecutar Optimizacion';
     }
   }
 
-  /* ════════════════════════════════════════════
-     SECCIÓN: CONFIG (Admin)
-     ════════════════════════════════════════════ */
+  /* ══ CONFIG (Admin) ════════════════════════════════════════════════
+     CORRECCION: se agrega preview de imagen en tiempo real para
+     que el admin verifique que la URL funciona antes de guardar.
+  ══════════════════════════════════════════════════════════════════ */
   async function renderConfig() {
-    contenido(`<div class="cargando">Cargando configuración...</div>`);
+    contenido(`<div class="cargando">Cargando configuracion...</div>`);
     try {
       const d = await fetch(`${API}/front/config`).then(r => r.json());
-      const campo = (id, label, val) =>
-        `<div class="campo-grp">
-           <label class="label">${label}</label>
-           <input id="${id}" type="text" class="campo" value="${val||''}">
-         </div>`;
-      contenido(panel('⚙️ Configurar Página de Login',
+
+      const campoImg = (id, label, val) => `
+        <div class="campo-grp">
+          <label class="label">${label}</label>
+          <input id="${id}" type="text" class="campo"
+                 value="${val||''}"
+                 placeholder="https://www.ucatolica.edu.co/ruta/imagen.jpg"
+                 oninput="previewImg('${id}', 'prev-${id}')">
+          <img id="prev-${id}"
+               src="${val||''}"
+               alt="Preview"
+               style="max-height:70px; border-radius:4px; margin-top:6px;
+                      display:${val&&val.trim()?'block':'none'}; object-fit:cover;"
+               onerror="this.style.display='none';"
+               onload="this.style.display='block';">
+          <small style="font-size:10px;color:var(--c-txts);">
+            La URL debe ser publica y accesible. Usa imagenes de ucatolica.edu.co o un servidor propio.
+          </small>
+        </div>`;
+
+      const campo = (id, label, val) => `
+        <div class="campo-grp">
+          <label class="label">${label}</label>
+          <input id="${id}" type="text" class="campo" value="${val||''}">
+        </div>`;
+
+      contenido(panel('Configurar Pagina de Login',
         `<div id="ae" class="alerta"></div>
          <div id="ao" class="alerta"></div>
-         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
-           ${campo('m1','Mensaje 1 (título izquierdo)',d.mensaje_1)}
-           ${campo('m2','Mensaje 2 (subtítulo izq.)',d.mensaje_2)}
-           ${campo('m3','Mensaje 3 (título derecho)',d.mensaje_3)}
-           ${campo('m4','Mensaje 4 (subtítulo der.)',d.mensaje_4)}
-           ${campo('i1','URL Imagen 1 (carrusel UCC)',d.url_img_1)}
-           ${campo('i2','URL Imagen 2 (carrusel UCC)',d.url_img_2)}
-           ${campo('i3','URL Imagen 3 (carrusel UCC)',d.url_img_3)}
+         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
+           ${campo('m1','Mensaje 1 (titulo izquierdo)',d.mensaje_1)}
+           ${campo('m2','Mensaje 2 (subtitulo izq.)',d.mensaje_2)}
+           ${campo('m3','Mensaje 3 (titulo derecho)',d.mensaje_3)}
+           ${campo('m4','Mensaje 4 (subtitulo der.)',d.mensaje_4)}
+           ${campoImg('i1','URL Imagen 1 del carrusel',d.url_img_1)}
+           ${campoImg('i2','URL Imagen 2 del carrusel',d.url_img_2)}
+           ${campoImg('i3','URL Imagen 3 del carrusel',d.url_img_3)}
          </div>
-         <small style="font-size:11px;color:var(--c-txts);display:block;margin-bottom:12px;">
-           💡 Para imágenes UCC usa fotos de: www.ucatolica.edu.co/portal/wp-content/uploads/
-         </small>
-         <button class="btn-ok" onclick="guardarConfig()" style="padding:12px 24px;">💾 Guardar Cambios</button>`
+         <button class="btn-ok" onclick="guardarConfig()" style="padding:12px 24px; margin-top:8px;">Guardar Cambios</button>`
       ));
     } catch(e) {
-      contenido(panel('⚙️ Configurar Página', alertaHtml('err', e.message)));
+      contenido(panel('Configurar Pagina', alertaHtml('err', e.message)));
+    }
+  }
+
+  function previewImg(inputId, previewId) {
+    const url     = document.getElementById(inputId)?.value || '';
+    const preview = document.getElementById(previewId);
+    if (!preview) return;
+    if (url.trim()) {
+      preview.src           = url.trim();
+      preview.style.display = 'block';
+      preview.onerror       = () => { preview.style.display = 'none'; };
+      preview.onload        = () => { preview.style.display = 'block'; };
+    } else {
+      preview.style.display = 'none';
     }
   }
 
@@ -393,15 +469,15 @@
           img_1: val('i1'), img_2: val('i2'), img_3: val('i3')
         })
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail);
-      ao.className = 'alerta ok'; ao.innerHTML = '✅ ' + d.mensaje;
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail);
+      ao.className = 'alerta ok'; ao.innerText = data.mensaje;
     } catch(e) {
-      ae.className = 'alerta err'; ae.innerHTML = '⚠️ ' + e.message;
+      ae.className = 'alerta err'; ae.innerText = e.message;
     }
   }
 
-  /* ── Cerrar sesión ── */
+  /* ── Cerrar sesion ── */
   async function cerrarSesion() {
     try { await fetch(`${API}/logout?token=${TOKEN}`, { method: 'POST' }); } catch{}
     window.location.href = '/login';

@@ -594,7 +594,7 @@ button { font-family: inherit; cursor: pointer; }
 
 /* Cargando */
 .cargando { text-align: center; padding: 40px; color: var(--c-txts); font-size: 14px; }
-.cargando::before { content: '⏳ '; }
+.cargando::before { content: 'Cargando: '; font-size: 11px; color: var(--c-txts); }
 
 @media (max-width: 1024px) {
   .btn-ham { display: flex; }

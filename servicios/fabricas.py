@@ -4,18 +4,19 @@ from sqlmodel import Session, select
 from modelos.entidades import Usuario, Rol, Estudiante, Profesor, Administrador, Grupo
 
 
-# ── Interface Segregation (I): cada interfaz tiene una sola responsabilidad ──
-
 class IUsuarioFac(ABC):
     @abstractmethod
     def CrearPer(self, session: Session, usuarioId: int, datos: dict) -> None: pass
 
 
-# ── Factory Method (Creacional): cada fábrica crea un tipo de perfil ──
-
+# Factory Method: cada fabrica crea un tipo de perfil
 class EstudianteFac(IUsuarioFac):
     def CrearPer(self, session: Session, usuarioId: int, datos: dict) -> None:
-        perfil = Estudiante(nombre=datos.get("nombre", "Estudiante Nuevo"), id_usuario=usuarioId)
+        perfil = Estudiante(
+            nombre=datos.get("nombre", "Estudiante Nuevo"),
+            semestre=datos.get("semestre", 1),  # SRP: recibe el semestre del contexto
+            id_usuario=usuarioId
+        )
         session.add(perfil)
 
 class ProfesorFac(IUsuarioFac):
@@ -37,13 +38,12 @@ class AdminFac(IUsuarioFac):
         session.add(perfil)
 
 
-# ── Abstract Factory (Creacional): agrupa todas las fábricas de usuario ──
-
+# Abstract Factory: agrupa todas las fabricas de usuario
 class FabricaUs:
     _fabricas: Dict[str, IUsuarioFac] = {
-        "Estudiante":     EstudianteFac(),
-        "Profesor":       ProfesorFac(),
-        "Administrador":  AdminFac()
+        "Estudiante":    EstudianteFac(),
+        "Profesor":      ProfesorFac(),
+        "Administrador": AdminFac()
     }
 
     @classmethod
@@ -54,8 +54,7 @@ class FabricaUs:
         return fab
 
 
-# ── Dependency Inversion (D): CreadorUs depende de IUsuarioFac, no de concretos ──
-
+# DIP: CreadorUs depende de IUsuarioFac, no de concretos
 class CreadorUs:
     @staticmethod
     def RegistrarUs(session: Session, rolNombre: str, credenciales: dict, perfilDatos: dict) -> Usuario:
@@ -76,21 +75,20 @@ class CreadorUs:
         return nuevoUs
 
 
-# ── Builder (Creacional): construye objetos Grupo paso a paso ──
-
+# Builder: construye Grupo paso a paso
 class ConstructorGrup:
     def __init__(self):
-        self._numGrupo  = 1
-        self._idMateria = None
-        self._idSalon   = None
-        self._idProfesor= None
-        self._dia       = "Lunes"
-        self._hora      = "7:00"
+        self._numGrupo   = 1
+        self._idMateria  = None
+        self._idSalon    = None
+        self._idProfesor = None
+        self._dia        = "Lunes"
+        self._hora       = "7:00"
 
-    def conNumero(self, n: int):       self._numGrupo   = n;  return self
-    def conMateria(self, id: int):     self._idMateria  = id; return self
-    def conSalon(self, id: int):       self._idSalon    = id; return self
-    def conProfesor(self, id: int):    self._idProfesor = id; return self
+    def conNumero(self, n: int):            self._numGrupo   = n;  return self
+    def conMateria(self, id: int):          self._idMateria  = id; return self
+    def conSalon(self, id: int):            self._idSalon    = id; return self
+    def conProfesor(self, id: int):         self._idProfesor = id; return self
     def conHorario(self, dia: str, hora: str):
         self._dia = dia; self._hora = hora; return self
 

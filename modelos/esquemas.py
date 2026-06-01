@@ -1,21 +1,21 @@
 from pydantic import BaseModel, field_validator, Field
-from typing import Optional
+from typing import Optional, Literal
 
 
 class EsquemaLogin(BaseModel):
-    codigo: str = Field(..., description="Código institucional universitario")
-    contrasena: str = Field(..., description="Contraseña de acceso")
+    codigo: str = Field(..., description="Codigo institucional", example="67001234")
+    contrasena: str = Field(..., description="Contrasena de acceso", example="MiClave12")
 
     @field_validator("codigo")
     @classmethod
     def val_codigo(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("El código institucional es obligatorio.")
+            raise ValueError("El codigo institucional es obligatorio.")
         if not v.isdigit():
-            raise ValueError("El código solo puede contener números, no letras ni símbolos.")
+            raise ValueError("El codigo solo puede contener numeros, no letras ni simbolos.")
         if len(v) < 8:
-            raise ValueError("El código debe tener al menos 8 dígitos.")
+            raise ValueError("El codigo debe tener al menos 8 digitos.")
         return v
 
     @field_validator("contrasena")
@@ -23,35 +23,52 @@ class EsquemaLogin(BaseModel):
     def val_contrasena(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("La contraseña es obligatoria.")
-        if len(v) < 4:
-            raise ValueError("La contraseña debe tener al menos 4 caracteres.")
+            raise ValueError("La contrasena es obligatoria.")
         return v
 
 
 class EsquemaRegistro(BaseModel):
-    rol_nombre: str = Field(..., description="Rol: Estudiante, Profesor o Administrador")
-    codigo: str = Field(..., description="Código institucional")
-    contrasena: str = Field(..., description="Contraseña")
-    nombre: str = Field(..., description="Nombre completo")
-    especialidad: Optional[str] = None
-
-    @field_validator("rol_nombre")
-    @classmethod
-    def val_rol(cls, v: str) -> str:
-        roles = ["Estudiante", "Profesor", "Administrador"]
-        if v not in roles:
-            raise ValueError(f"Rol inválido. Opciones: {', '.join(roles)}.")
-        return v
+    # Literal crea un enum en Swagger → se muestra como menu desplegable
+    # ISP: cada campo tiene una descripcion y ejemplo especificos
+    rol_nombre: Literal["Estudiante", "Profesor", "Administrador"] = Field(
+        ...,
+        description="Rol del usuario en el sistema"
+    )
+    codigo: str = Field(
+        ...,
+        description="Solo numeros. Estudiante: 8 dig. inicia 6700. Profesor: 10 dig. Admin: 8 dig. inicia 9900.",
+        example="67001234"
+    )
+    contrasena: str = Field(
+        ...,
+        description="Minimo 8 caracteres, al menos una mayuscula y una minuscula.",
+        example="MiClave12"
+    )
+    nombre: str = Field(
+        ...,
+        description="Nombre completo del usuario",
+        example="Juan Perez"
+    )
+    especialidad: Optional[str] = Field(
+        None,
+        description="Solo Profesores: 'Ingenieria de Sistemas' o 'Ciencias Basicas'",
+        example="Ingenieria de Sistemas"
+    )
+    semestre: Optional[int] = Field(
+        None,
+        ge=1, le=10,
+        description="Solo Estudiantes: semestre academico actual (1 a 10)",
+        example=1
+    )
 
     @field_validator("codigo")
     @classmethod
     def val_codigo(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("El código es obligatorio.")
+            raise ValueError("El codigo es obligatorio.")
         if not v.isdigit():
-            raise ValueError("El código solo puede contener números.")
+            raise ValueError("El codigo solo puede contener numeros.")
         return v
 
     @field_validator("nombre")
@@ -69,19 +86,23 @@ class EsquemaRegistro(BaseModel):
     def val_contrasena(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("La contraseña es obligatoria.")
-        if len(v) < 4:
-            raise ValueError("La contraseña debe tener al menos 4 caracteres.")
+            raise ValueError("La contrasena es obligatoria.")
+        if len(v) < 8:
+            raise ValueError("La contrasena debe tener minimo 8 caracteres.")
+        if not any(c.isupper() for c in v):
+            raise ValueError("La contrasena debe contener al menos una letra mayuscula.")
+        if not any(c.islower() for c in v):
+            raise ValueError("La contrasena debe contener al menos una letra minuscula del abecedario.")
         return v
 
 
 class EsquemaMatric(BaseModel):
     id_materia: int = Field(..., gt=0, description="ID de la materia a inscribir")
-    id_grupo: Optional[int] = Field(None, gt=0, description="ID del grupo específico (opcional)")
+    id_grupo: Optional[int] = Field(None, gt=0, description="ID del grupo especifico (opcional)")
 
 
 class EsquemaConfigUp(BaseModel):
-    codigo_admin: str = Field(..., description="Código del administrador")
+    codigo_admin: str = Field(..., description="Codigo del administrador")
     msg_1: Optional[str] = None
     msg_2: Optional[str] = None
     msg_3: Optional[str] = None
@@ -95,7 +116,7 @@ class EsquemaConfigUp(BaseModel):
     def val_admin(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("El código de administrador es obligatorio.")
+            raise ValueError("El codigo de administrador es obligatorio.")
         if not v.isdigit():
-            raise ValueError("El código solo puede contener números.")
+            raise ValueError("El codigo solo puede contener numeros.")
         return v
