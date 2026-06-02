@@ -82,21 +82,34 @@ class Salon(SQLModel, table=True):
 
 
 class Grupo(SQLModel, table=True):
-    """N:1 Materia | N:1 Salon | N:1 Profesor | 1:N Inscripcion"""
+    """
+    N:1 Materia | N:1 Salon | N:1 Profesor | 1:N Inscripcion
+    Sesion 1: dia  + hora  + id_salon  (ya existia)
+    Sesion 2: dia2 + hora2 + id_salon2 (NUEVO — 2 veces por semana)
+    Franjas validas: "07:00","09:00","11:00" (manana) | "18:00","20:00" (noche)
+    Cada franja dura 2 horas.
+    """
     id: Optional[int] = Field(default=None, primary_key=True)
     num_grupo: int
     cupo_maximo: int = 30
     id_materia:  Optional[int] = Field(default=None, foreign_key="materia.id")
     id_salon:    Optional[int] = Field(default=None, foreign_key="salon.id")
     id_profesor: Optional[int] = Field(default=None, foreign_key="profesor.id")
+    # Sesion 1
     dia:  Optional[str] = None
-    hora: Optional[str] = None
+    hora: Optional[str] = None   # "07:00" | "09:00" | "11:00" | "18:00" | "20:00"
+    # Sesion 2 — misma hora, dia diferente, salon puede ser diferente
+    dia2:      Optional[str] = None
+    hora2:     Optional[str] = None
+    id_salon2: Optional[int] = Field(default=None, foreign_key="salon.id")
 
     materia:  Optional["Materia"]  = Relationship(back_populates="grupos")
-    salon:    Optional["Salon"]    = Relationship(back_populates="grupos")
+    salon:    Optional["Salon"]    = Relationship(
+        back_populates="grupos",
+        sa_relationship_kwargs={"foreign_keys": "[Grupo.id_salon]"}
+    )
     profesor: Optional["Profesor"] = Relationship(back_populates="grupos")
     inscripciones: List["Inscripcion"] = Relationship(back_populates="grupo")
-
 
 class Inscripcion(SQLModel, table=True):
     """

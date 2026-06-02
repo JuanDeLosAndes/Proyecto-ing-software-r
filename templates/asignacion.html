@@ -134,37 +134,63 @@
   }
 
   /* ══ HORARIO (solo Estudiante y Profesor) ════════════════════════ */
-  async function renderHorario() {
+async function renderHorario() {
     contenido(`<div class="cargando">Cargando horario...</div>`);
     try {
-      const h   = await apiGet('/horarios');
-      const dias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
-      const horas = Object.keys(h).sort();
+      const h    = await apiGet('/horarios');
+      const dias  = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+      const horas = Object.keys(h).sort(); // "07:00 - 09:00", "09:00 - 11:00", ...
 
       if (!horas.length) {
         contenido(panel('📅 Mi Horario',
-          `<div class="estado-vacio"><span>📋</span>No tienes clases asignadas actualmente.</div>`
+          `<div class="estado-vacio">
+             <span>📋</span>
+             No tienes clases asignadas actualmente.<br>
+             <small>Inscribe una materia para que aparezca tu horario.</small>
+           </div>`
         ));
         return;
       }
 
-      const filas = horas.map(hr => {
+      const filas = horas.map(franja => {
         const celdas = dias.map(dia => {
-          const cl = h[hr]?.[dia];
-          return cl
-            ? `<td class="ocu"><strong>${cl.materia}</strong><br><small>${cl.salon}</small><br><small>${cl.info_extra}</small></td>`
-            : `<td class="vac">-</td>`;
+          const cl = h[franja]?.[dia];
+          if (!cl) return `<td class="vac">-</td>`;
+
+          // Tooltip: muestra salon, grupo y profesor al pasar el mouse
+          const tooltip = `
+            <div class="tooltip-pop">
+              <strong>${cl.materia}</strong>
+              Salon: ${cl.salon_nombre || cl.salon}<br>
+              Grupo: ${cl.num_grupo}<br>
+              ${ROL === 'Estudiante' ? 'Profesor(a): ' + (cl.prof_nombre || 'N/A') : 'Inscritos: ' + (cl.info_extra || '')}
+            </div>`;
+
+          return `<td class="ocu">
+            ${tooltip}
+            <div class="cell-inner">
+              <strong>${cl.materia}</strong><br>
+              <small>${cl.salon}</small><br>
+              <small style="color:var(--c-txts);">${cl.info_extra}</small>
+            </div>
+          </td>`;
         }).join('');
-        return `<tr><td><strong>${hr}</strong></td>${celdas}</tr>`;
+        return `<tr><td><strong>${franja}</strong></td>${celdas}</tr>`;
       }).join('');
 
       contenido(panel('📅 Mi Horario',
-        `<div class="tbl-wrap">
-          <table class="tbl">
-            <thead><tr><th>Hora</th>${dias.map(d=>`<th>${d}</th>`).join('')}</tr></thead>
-            <tbody>${filas}</tbody>
-          </table>
-        </div>`
+        `<p style="font-size:11px;color:var(--c-txts);margin-bottom:12px;">
+           Pasa el mouse sobre una clase para ver salon, grupo y profesor.
+         </p>
+         <div class="tbl-wrap">
+           <table class="tbl">
+             <thead><tr>
+               <th>Franja</th>
+               ${dias.map(d=>`<th>${d}</th>`).join('')}
+             </tr></thead>
+             <tbody>${filas}</tbody>
+           </table>
+         </div>`
       ));
     } catch(e) {
       contenido(panel('📅 Mi Horario', alertaHtml('err', e.message)));

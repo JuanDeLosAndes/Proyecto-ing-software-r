@@ -611,4 +611,52 @@ button { font-family: inherit; cursor: pointer; }
   .frm-fila { flex-direction: column; }
   .frm-fila .campo { width: 100%; }
   .frm-fila .btn-p { width: 100%; }
+
+  /* ================================================================
+   TOOLTIP EN CELDAS DEL HORARIO
+   Al poner el mouse sobre una clase asignada, aparece un popup
+   con: Salon, Grupo y Nombre del Profesor.
+   ================================================================ */
+.tbl td.ocu { position: relative; overflow: visible; cursor: pointer; }
+
+.cell-inner { position: relative; z-index: 1; }
+
+.tooltip-pop {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--c-osc);
+  color: var(--c-bla);
+  border: 1px solid var(--c-med);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 9999;
+  box-shadow: var(--sh-md);
+  line-height: 1.8;
+  text-align: left;
+  pointer-events: none;
+}
+.tooltip-pop::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--c-osc);
+}
+.tooltip-pop strong { color: var(--c-ama); display: block; margin-bottom: 2px; }
+
+/* Mostrar solo en hover — sin JavaScript para el tooltip */
+.tbl td.ocu:hover .tooltip-pop { display: block; }
+
+/* En movil el tooltip se ancla arriba para no salirse de pantalla */
+@media (max-width: 640px) {
+  .tooltip-pop { position: fixed; bottom: auto; top: 50%; left: 50%;
+                 transform: translate(-50%, -50%); }
+}
 }
