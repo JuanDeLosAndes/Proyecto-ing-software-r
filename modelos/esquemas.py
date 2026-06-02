@@ -28,8 +28,6 @@ class EsquemaLogin(BaseModel):
 
 
 class EsquemaRegistro(BaseModel):
-    # Literal crea un enum en Swagger → se muestra como menu desplegable
-    # ISP: cada campo tiene una descripcion y ejemplo especificos
     rol_nombre: Literal["Estudiante", "Profesor", "Administrador"] = Field(
         ...,
         description="Rol del usuario en el sistema"
@@ -99,6 +97,10 @@ class EsquemaRegistro(BaseModel):
 class EsquemaMatric(BaseModel):
     id_materia: int = Field(..., gt=0, description="ID de la materia a inscribir")
     id_grupo: Optional[int] = Field(None, gt=0, description="ID del grupo especifico (opcional)")
+    jornada: Literal["manana", "noche", "sabado"] = Field(
+        "manana",
+        description="Jornada preferida: 'manana' (07-13h), 'noche' (18-22h) o 'sabado' (07-13h + 15-17h)"
+    )
 
 
 class EsquemaConfigUp(BaseModel):

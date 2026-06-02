@@ -90,6 +90,8 @@
       salones:   renderSalones,
       calificar: renderCalificar,
       optimizar: renderOptimizar,
+      bd:        renderBD,
+      mer:       renderMER,
       config:    renderConfig
     };
     if (mapa[sec]) mapa[sec]();
@@ -105,6 +107,267 @@
   });
 
   /* ── HTTP abstractions (DIP) ── */
+  /* ══ VER BASE DE DATOS (Admin) ══════════════════════════════════ */
+  async function renderBD() {
+    contenido(`<div class="cargando">Cargando base de datos...</div>`);
+    try {
+      const d = await apiGet('/admin/bd');
+      const tablaHTML = (cols, filas, datos) => {
+        if (!datos.length) return `<p style="color:var(--c-txts);font-size:12px;margin:8px 0 16px;">Sin registros.</p>`;
+        const enc = cols.map(c => `<th>${c}</th>`).join('');
+        const rows = datos.map(r => `<tr>${filas(r)}</tr>`).join('');
+        return `<div class="tbl-wrap" style="margin-bottom:24px;">
+          <table class="tbl tbl-g"><thead><tr>${enc}</tr></thead><tbody>${rows}</tbody></table>
+        </div>`;
+      };
+
+      contenido(panel('Base de Datos — Vista Completa',
+        `<p style="font-size:11px;color:var(--c-txts);margin-bottom:16px;">
+           Todos los registros actuales. Los datos se actualizan en tiempo real.
+         </p>
+
+         <h4 style="font-size:13px;color:var(--c-osc);margin:16px 0 6px;">Usuarios (${d.usuarios.length})</h4>
+         ${tablaHTML(['ID','Codigo','Rol','Nombre'],
+           r => `<td>${r.id}</td><td><code>${r.codigo}</code></td><td><span class="badge ${r.rol==='Administrador'?'badge-err':r.rol==='Profesor'?'badge-warn':'badge-ok'}">${r.rol}</span></td><td>${r.nombre}</td>`,
+           d.usuarios)}
+
+         <h4 style="font-size:13px;color:var(--c-osc);margin:16px 0 6px;">Estudiantes (${d.estudiantes.length})</h4>
+         ${tablaHTML(['ID','Nombre','Semestre','ID Usuario'],
+           r => `<td>${r.id}</td><td>${r.nombre}</td><td>Sem. ${r.semestre}</td><td>${r.id_usuario}</td>`,
+           d.estudiantes)}
+
+         <h4 style="font-size:13px;color:var(--c-osc);margin:16px 0 6px;">Profesores (${d.profesores.length})</h4>
+         ${tablaHTML(['ID','Nombre','Especialidad','ID Usuario'],
+           r => `<td>${r.id}</td><td>${r.nombre}</td><td>${r.especialidad}</td><td>${r.id_usuario}</td>`,
+           d.profesores)}
+
+         <h4 style="font-size:13px;color:var(--c-osc);margin:16px 0 6px;">Administradores (${d.administradores.length})</h4>
+         ${tablaHTML(['ID','Nombre','Codigo Admin','ID Usuario'],
+           r => `<td>${r.id}</td><td>${r.nombre}</td><td>${r.codigo_admin}</td><td>${r.id_usuario}</td>`,
+           d.administradores)}
+
+         <h4 style="font-size:13px;color:var(--c-osc);margin:16px 0 6px;">Salones (${d.salones.length})</h4>
+         ${tablaHTML(['ID','Nombre','Capacidad'],
+           r => `<td>${r.id}</td><td>${r.nombre}</td><td>${r.capacidad}</td>`,
+           d.salones)}
+
+         <h4 style="font-size:13px;color:var(--c-osc);margin:16px 0 6px;">Grupos (${d.grupos.length})</h4>
+         ${tablaHTML(['ID','Grupo','Materia','Profesor','Sesion 1','Salon 1','Sesion 2','Salon 2'],
+           r => `<td>${r.id}</td><td>${r.num_grupo}</td><td>${r.materia}</td><td>${r.profesor}</td><td>${r.sesion_1}</td><td>${r.salon_1}</td><td>${r.sesion_2}</td><td>${r.salon_2}</td>`,
+           d.grupos)}
+
+         <h4 style="font-size:13px;color:var(--c-osc);margin:16px 0 6px;">Inscripciones (${d.inscripciones.length})</h4>
+         ${tablaHTML(['ID','Estudiante','Materia','Grupo','Estado','Aprobada'],
+           r => `<td>${r.id}</td><td>${r.estudiante}</td><td>${r.materia}</td><td>${r.id_grupo||'—'}</td><td>${r.estado}</td><td>${r.aprobada===null?'En curso':r.aprobada?'Si':'No'}</td>`,
+           d.inscripciones)}
+
+         <h4 style="font-size:13px;color:var(--c-osc);margin:16px 0 6px;">Materias (${d.materias.length})</h4>
+         ${tablaHTML(['ID','Nombre','Facultad','Sem.','Cred.','Prereq ID'],
+           r => `<td>${r.id}</td><td>${r.nombre}</td><td>${r.facultad}</td><td>${r.semestre}</td><td>${r.creditos}</td><td>${r.id_prerequisito||'—'}</td>`,
+           d.materias)}
+        `
+      ));
+    } catch(e) {
+      contenido(panel('Base de Datos', alertaHtml('err', e.message)));
+    }
+  }
+
+  /* ══ MER — Diagrama de Entidad Relacion (Admin) ═════════════════ */
+  function renderMER() {
+    contenido(panel('Diagrama MER — Modelo Entidad Relacion',
+      `<p style="font-size:12px;color:var(--c-txts);margin-bottom:16px;">
+         Estructura relacional del sistema. Las lineas muestran las FK y cardinalidades.
+       </p>
+       <div style="overflow-x:auto;">
+         <svg viewBox="0 0 960 680" width="100%" style="min-width:700px;font-family:inherit;">
+           <defs>
+             <marker id="arrowMer" viewBox="0 0 10 10" refX="9" refY="5"
+               markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+               <path d="M1 1L9 5L1 9" fill="none" stroke="#4f79a6" stroke-width="1.5"
+                     stroke-linecap="round" stroke-linejoin="round"/>
+             </marker>
+           </defs>
+           <style>
+             .mer-tbl { fill:#e8f0fe; stroke:#4f79a6; stroke-width:1.5; rx:8; }
+             .mer-hdr { fill:#0d1b4c; }
+             .mer-txt { font-size:11px; fill:#0d1b4c; font-family:inherit; }
+             .mer-hdr-txt { font-size:12px; fill:#fff; font-weight:600; font-family:inherit; }
+             .mer-pk  { font-size:10px; fill:#a52a2a; font-family:inherit; font-weight:600; }
+             .mer-fk  { font-size:10px; fill:#185fa5; font-family:inherit; }
+             .mer-ln  { stroke:#4f79a6; stroke-width:1.2; fill:none; marker-end:url(#arrowMer); }
+             .mer-lbl { font-size:10px; fill:#3a4a6b; font-family:inherit; }
+           </style>
+
+           <!-- ROL -->
+           <rect x="10" y="10" width="130" height="70" rx="8" class="mer-tbl"/>
+           <rect x="10" y="10" width="130" height="24" rx="8" class="mer-hdr"/>
+           <rect x="10" y="26" width="130" height="8" class="mer-hdr"/>
+           <text x="75" y="27" text-anchor="middle" class="mer-hdr-txt">ROL</text>
+           <text x="20" y="48" class="mer-pk">PK id</text>
+           <text x="20" y="63" class="mer-txt">nombre_rol</text>
+
+           <!-- USUARIO -->
+           <rect x="180" y="10" width="145" height="100" rx="8" class="mer-tbl"/>
+           <rect x="180" y="10" width="145" height="24" rx="8" class="mer-hdr"/>
+           <rect x="180" y="26" width="145" height="8" class="mer-hdr"/>
+           <text x="252" y="27" text-anchor="middle" class="mer-hdr-txt">USUARIO</text>
+           <text x="190" y="48" class="mer-pk">PK id</text>
+           <text x="190" y="63" class="mer-txt">codigo (unique)</text>
+           <text x="190" y="76" class="mer-txt">contrasena</text>
+           <text x="190" y="89" class="mer-fk">FK id_rol</text>
+
+           <!-- SESION_TOKEN -->
+           <rect x="370" y="10" width="155" height="115" rx="8" class="mer-tbl"/>
+           <rect x="370" y="10" width="155" height="24" rx="8" class="mer-hdr"/>
+           <rect x="370" y="26" width="155" height="8" class="mer-hdr"/>
+           <text x="447" y="27" text-anchor="middle" class="mer-hdr-txt">SESION_TOKEN</text>
+           <text x="380" y="48" class="mer-pk">PK id</text>
+           <text x="380" y="61" class="mer-txt">token (unique)</text>
+           <text x="380" y="74" class="mer-fk">FK id_usuario</text>
+           <text x="380" y="87" class="mer-txt">rol, codigo_usuario</text>
+           <text x="380" y="100" class="mer-txt">creado_en, expira_en</text>
+           <text x="380" y="113" class="mer-txt">activo</text>
+
+           <!-- ESTUDIANTE -->
+           <rect x="10" y="140" width="145" height="85" rx="8" class="mer-tbl"/>
+           <rect x="10" y="140" width="145" height="24" rx="8" class="mer-hdr"/>
+           <rect x="10" y="156" width="145" height="8" class="mer-hdr"/>
+           <text x="82" y="157" text-anchor="middle" class="mer-hdr-txt">ESTUDIANTE</text>
+           <text x="20" y="179" class="mer-pk">PK id</text>
+           <text x="20" y="192" class="mer-txt">nombre</text>
+           <text x="20" y="205" class="mer-txt">semestre</text>
+           <text x="20" y="218" class="mer-fk">FK id_usuario</text>
+
+           <!-- PROFESOR -->
+           <rect x="180" y="140" width="145" height="85" rx="8" class="mer-tbl"/>
+           <rect x="180" y="140" width="145" height="24" rx="8" class="mer-hdr"/>
+           <rect x="180" y="156" width="145" height="8" class="mer-hdr"/>
+           <text x="252" y="157" text-anchor="middle" class="mer-hdr-txt">PROFESOR</text>
+           <text x="190" y="179" class="mer-pk">PK id</text>
+           <text x="190" y="192" class="mer-txt">nombre</text>
+           <text x="190" y="205" class="mer-txt">especialidad</text>
+           <text x="190" y="218" class="mer-fk">FK id_usuario</text>
+
+           <!-- ADMINISTRADOR -->
+           <rect x="370" y="155" width="155" height="85" rx="8" class="mer-tbl"/>
+           <rect x="370" y="155" width="155" height="24" rx="8" class="mer-hdr"/>
+           <rect x="370" y="171" width="155" height="8" class="mer-hdr"/>
+           <text x="447" y="172" text-anchor="middle" class="mer-hdr-txt">ADMINISTRADOR</text>
+           <text x="380" y="194" class="mer-pk">PK id</text>
+           <text x="380" y="207" class="mer-txt">nombre</text>
+           <text x="380" y="220" class="mer-txt">codigo_admin</text>
+           <text x="380" y="233" class="mer-fk">FK id_usuario</text>
+
+           <!-- MATERIA -->
+           <rect x="10" y="290" width="160" height="115" rx="8" class="mer-tbl"/>
+           <rect x="10" y="290" width="160" height="24" rx="8" class="mer-hdr"/>
+           <rect x="10" y="306" width="160" height="8" class="mer-hdr"/>
+           <text x="90" y="307" text-anchor="middle" class="mer-hdr-txt">MATERIA</text>
+           <text x="20" y="329" class="mer-pk">PK id</text>
+           <text x="20" y="342" class="mer-txt">nombre, creditos</text>
+           <text x="20" y="355" class="mer-txt">facultad, semestre</text>
+           <text x="20" y="368" class="mer-fk">FK id_prerequisito (self)</text>
+
+           <!-- SALON -->
+           <rect x="210" y="290" width="145" height="85" rx="8" class="mer-tbl"/>
+           <rect x="210" y="290" width="145" height="24" rx="8" class="mer-hdr"/>
+           <rect x="210" y="306" width="145" height="8" class="mer-hdr"/>
+           <text x="282" y="307" text-anchor="middle" class="mer-hdr-txt">SALON</text>
+           <text x="220" y="329" class="mer-pk">PK id</text>
+           <text x="220" y="342" class="mer-txt">nombre</text>
+           <text x="220" y="355" class="mer-txt">capacidad</text>
+
+           <!-- GRUPO -->
+           <rect x="400" y="290" width="210" height="175" rx="8" class="mer-tbl"/>
+           <rect x="400" y="290" width="210" height="24" rx="8" class="mer-hdr"/>
+           <rect x="400" y="306" width="210" height="8" class="mer-hdr"/>
+           <text x="505" y="307" text-anchor="middle" class="mer-hdr-txt">GRUPO</text>
+           <text x="410" y="329" class="mer-pk">PK id</text>
+           <text x="410" y="342" class="mer-txt">num_grupo, cupo_maximo</text>
+           <text x="410" y="355" class="mer-fk">FK id_materia</text>
+           <text x="410" y="368" class="mer-fk">FK id_salon (sesion 1)</text>
+           <text x="410" y="381" class="mer-fk">FK id_salon2 (sesion 2)</text>
+           <text x="410" y="394" class="mer-fk">FK id_profesor</text>
+           <text x="410" y="407" class="mer-txt">dia, hora (ses.1)</text>
+           <text x="410" y="420" class="mer-txt">dia2, hora2 (ses.2)</text>
+           <text x="410" y="433" class="mer-lbl" style="fill:#a52a2a;font-style:italic;">Cada clase = 2h, 2x/sem</text>
+           <text x="410" y="455" class="mer-lbl" style="fill:#0a7a3c;font-style:italic;">Sabado: 07-13 o 15-17</text>
+
+           <!-- INSCRIPCION -->
+           <rect x="640" y="290" width="175" height="130" rx="8" class="mer-tbl"/>
+           <rect x="640" y="290" width="175" height="24" rx="8" class="mer-hdr"/>
+           <rect x="640" y="306" width="175" height="8" class="mer-hdr"/>
+           <text x="727" y="307" text-anchor="middle" class="mer-hdr-txt">INSCRIPCION</text>
+           <text x="650" y="329" class="mer-pk">PK id</text>
+           <text x="650" y="342" class="mer-fk">FK id_estudiante</text>
+           <text x="650" y="355" class="mer-fk">FK id_materia</text>
+           <text x="650" y="368" class="mer-fk">FK id_grupo</text>
+           <text x="650" y="381" class="mer-txt">estado</text>
+           <text x="650" y="394" class="mer-txt">aprobada</text>
+           <text x="650" y="410" class="mer-lbl" style="fill:#a52a2a;font-style:italic;">UNIQUE(est,mat)</text>
+
+           <!-- RELACIONES (lineas con flecha) -->
+           <!-- ROL 1:N USUARIO -->
+           <line x1="140" y1="45" x2="178" y2="45" class="mer-ln"/>
+           <text x="148" y="42" class="mer-lbl">1:N</text>
+
+           <!-- USUARIO 1:N SESION_TOKEN -->
+           <line x1="325" y1="55" x2="368" y2="55" class="mer-ln"/>
+           <text x="333" y="50" class="mer-lbl">1:N</text>
+
+           <!-- USUARIO 1:1 ESTUDIANTE -->
+           <line x1="82" y1="110" x2="82" y2="138" class="mer-ln"/>
+           <text x="86" y="128" class="mer-lbl">1:1</text>
+
+           <!-- USUARIO 1:1 PROFESOR -->
+           <line x1="252" y1="110" x2="252" y2="138" class="mer-ln"/>
+           <text x="256" y="128" class="mer-lbl">1:1</text>
+
+           <!-- USUARIO 1:1 ADMINISTRADOR -->
+           <line x1="447" y1="110" x2="447" y2="153" class="mer-ln"/>
+           <text x="451" y="140" class="mer-lbl">1:1</text>
+
+           <!-- MATERIA self-ref (prerequisito) -->
+           <path d="M10 350 Q-15 350 -15 310 Q-15 290 10 290" class="mer-ln" fill="none"/>
+           <text x="-10" y="325" class="mer-lbl" style="fill:#a52a2a;">self</text>
+
+           <!-- MATERIA 1:N GRUPO -->
+           <line x1="170" y1="340" x2="398" y2="340" class="mer-ln"/>
+           <text x="270" y="335" class="mer-lbl">1:N</text>
+
+           <!-- SALON 1:N GRUPO (sesion1) -->
+           <line x1="355" y1="335" x2="398" y2="345" class="mer-ln"/>
+           <text x="358" y="330" class="mer-lbl">1:N</text>
+
+           <!-- SALON 1:N GRUPO (sesion2) -->
+           <path d="M355 355 Q380 370 400 370" class="mer-ln" fill="none"/>
+           <text x="360" y="372" class="mer-lbl">1:N</text>
+
+           <!-- PROFESOR 1:N GRUPO -->
+           <line x1="252" y1="225" x2="460" y2="288" class="mer-ln"/>
+           <text x="300" y="260" class="mer-lbl">1:N</text>
+
+           <!-- GRUPO 1:N INSCRIPCION -->
+           <line x1="610" y1="380" x2="638" y2="380" class="mer-ln"/>
+           <text x="616" y="375" class="mer-lbl">1:N</text>
+
+           <!-- ESTUDIANTE N:M MATERIA via INSCRIPCION -->
+           <path d="M82 225 Q82 260 680 355" class="mer-ln" fill="none"/>
+           <text x="200" y="252" class="mer-lbl">N:M (via Inscripcion)</text>
+
+           <!-- Leyenda -->
+           <rect x="650" y="460" width="295" height="95" rx="6" fill="#f4f6f9" stroke="#dce3ed" stroke-width="1"/>
+           <text x="660" y="478" style="font-size:11px;fill:#0d1b4c;font-weight:700;font-family:inherit;">Leyenda</text>
+           <text x="660" y="494" class="mer-pk">PK = Clave primaria</text>
+           <text x="660" y="508" class="mer-fk">FK = Clave foranea</text>
+           <text x="660" y="522" class="mer-lbl">Franjas: 2h duracion obligatoria</text>
+           <text x="660" y="536" class="mer-lbl">Jornadas: manana / noche / sabado</text>
+           <text x="660" y="550" class="mer-lbl">Sabado especial: 15:00-17:00</text>
+         </svg>
+       </div>`
+    ));
+  }
+
   async function apiGet(url) {
     const r = await fetch(`${API}${url}?token=${TOKEN}`);
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || 'Error del servidor.'); }
@@ -234,6 +497,11 @@ async function renderHorario() {
        </p>
        <div class="frm-fila">
          <input type="number" id="id-mat" class="campo" placeholder="ID de la materia" min="1">
+         <select id="jornada-sel" class="campo" style="max-width:180px;">
+           <option value="manana">Manana (07:00 - 13:00)</option>
+           <option value="noche">Noche (18:00 - 22:00)</option>
+           <option value="sabado">Sabado (07:00-13:00 / 15:00-17:00)</option>
+         </select>
          <button class="btn-p" onclick="buscarGrupos()" style="width:auto;">Buscar Grupos</button>
        </div>
        <div id="grupos-res"></div>`
@@ -242,6 +510,7 @@ async function renderHorario() {
 
   async function buscarGrupos() {
     const idM = parseInt(document.getElementById('id-mat').value);
+    const jornada = document.getElementById('jornada-sel')?.value || 'manana';
     const res = document.getElementById('grupos-res');
     const ae  = document.getElementById('ae');
     ae.className = 'alerta';
@@ -253,7 +522,7 @@ async function renderHorario() {
       const gs = await apiGet(`/materias/${idM}/grupos`);
       if (!gs.length) {
         res.innerHTML = `<p style="color:var(--c-txts);margin-top:12px;">Sin grupos existentes. Se creara uno al inscribirse.</p>
-          <button class="btn-ok" style="margin-top:10px;" onclick="inscribirse(${idM},null)">Inscribirse (grupo automatico)</button>`;
+          <button class="btn-ok" style="margin-top:10px;" onclick="inscribirse(${idM},null,jornada)">Inscribirse (grupo automatico)</button>`;
         return;
       }
       const filas = gs.map(g => `
@@ -261,7 +530,7 @@ async function renderHorario() {
           <td>Grupo ${g.num_grupo}</td>
           <td>${g.dia||'-'}</td><td>${g.hora||'-'}</td>
           <td><span class="badge ${g.inscritos<g.limite?'badge-ok':'badge-err'}">${g.inscritos}/${g.limite}</span></td>
-          <td><button class="btn-ok" onclick="inscribirse(${idM},${g.id_grupo})">Elegir</button></td>
+          <td><button class="btn-ok" onclick="inscribirse(${idM},${g.id_grupo},jornada)">Elegir</button></td>
         </tr>`).join('');
       res.innerHTML = `
         <div class="tbl-wrap" style="margin-top:12px;">
@@ -270,19 +539,19 @@ async function renderHorario() {
             <tbody>${filas}</tbody>
           </table>
         </div>
-        <button class="btn-s" style="margin-top:12px;" onclick="inscribirse(${idM},null)">Asignar automaticamente</button>`;
+        <button class="btn-s" style="margin-top:12px;" onclick="inscribirse(${idM},null,jornada)">Asignar automaticamente</button>`;
     } catch(e) {
       res.innerHTML = '';
       ae.className = 'alerta err'; ae.innerText = e.message;
     }
   }
 
-  async function inscribirse(idMat, idGrupo) {
+  async function inscribirse(idMat, idGrupo, jornada) {
     const ae = document.getElementById('ae');
     const ao = document.getElementById('ao');
     ae.className = ao.className = 'alerta';
     try {
-      const r = await apiPost('/inscribir', { id_materia: idMat, id_grupo: idGrupo });
+      const r = await apiPost('/inscribir', { id_materia: idMat, id_grupo: idGrupo, jornada: jornada || 'manana' });
       ao.className = 'alerta ok'; ao.innerText = r.mensaje;
       document.getElementById('grupos-res').innerHTML = '';
     } catch(e) {

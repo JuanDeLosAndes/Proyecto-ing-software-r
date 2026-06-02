@@ -14,7 +14,7 @@ class EstudianteFac(IUsuarioFac):
     def CrearPer(self, session: Session, usuarioId: int, datos: dict) -> None:
         perfil = Estudiante(
             nombre=datos.get("nombre", "Estudiante Nuevo"),
-            semestre=datos.get("semestre", 1),  # SRP: recibe el semestre del contexto
+            semestre=datos.get("semestre", 1),
             id_usuario=usuarioId
         )
         session.add(perfil)
@@ -75,15 +75,19 @@ class CreadorUs:
         return nuevoUs
 
 
-# Builder: construye Grupo paso a paso
+# Builder: construye Grupo paso a paso (sesion 2 encapsulada — correccion Builder/LSP)
 class ConstructorGrup:
     def __init__(self):
-        self._numGrupo   = 1
-        self._idMateria  = None
-        self._idSalon    = None
-        self._idProfesor = None
-        self._dia        = "Lunes"
-        self._hora       = "7:00"
+        self._numGrupo    = 1
+        self._idMateria   = None
+        self._idSalon     = None
+        self._idProfesor  = None
+        self._dia         = "Lunes"
+        self._hora        = "07:00"
+        # Sesion 2 (ahora parte del builder)
+        self._dia2        = None
+        self._hora2       = None
+        self._idSalon2    = None
 
     def conNumero(self, n: int):            self._numGrupo   = n;  return self
     def conMateria(self, id: int):          self._idMateria  = id; return self
@@ -92,12 +96,20 @@ class ConstructorGrup:
     def conHorario(self, dia: str, hora: str):
         self._dia = dia; self._hora = hora; return self
 
+    def conSesion2(self, dia: str, hora: str, id_salon: int):
+        """Sesion 2: dia diferente, misma franja horaria, salon puede diferir."""
+        self._dia2 = dia; self._hora2 = hora; self._idSalon2 = id_salon
+        return self
+
     def construir(self) -> Grupo:
         return Grupo(
-            num_grupo   = self._numGrupo,
-            id_materia  = self._idMateria,
-            id_salon    = self._idSalon,
-            id_profesor = self._idProfesor,
-            dia         = self._dia,
-            hora        = self._hora
+            num_grupo    = self._numGrupo,
+            id_materia   = self._idMateria,
+            id_salon     = self._idSalon,
+            id_profesor  = self._idProfesor,
+            dia          = self._dia,
+            hora         = self._hora,
+            dia2         = self._dia2,
+            hora2        = self._hora2,
+            id_salon2    = self._idSalon2,
         )

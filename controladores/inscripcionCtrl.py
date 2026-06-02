@@ -12,22 +12,40 @@ from servicios.sesiones import ObtenerSesAct
 
 router = APIRouter()
 
-FRANJAS_HORARIO = ["07:00", "09:00", "11:00", "18:00", "20:00"]
-
-PARES_DIAS = [
-    ("Lunes",    "Miercoles"),
-    ("Martes",   "Jueves"),
-    ("Miercoles","Viernes"),
-    ("Lunes",    "Jueves"),
-    ("Martes",   "Viernes"),
-]
+# ── Franjas horarias: 2h de duracion obligatoria ──────────────────
+# Jornada manana : 07-09, 09-11, 11-13
+# Jornada noche  : 18-20, 20-22
+# Sabado manana  : 07-09, 09-11, 11-13
+# Sabado especial: 15-17 (unica franja de tarde, solo sabado)
+FRANJAS_MANANA  = ["07:00", "09:00", "11:00"]
+FRANJAS_NOCHE   = ["18:00", "20:00"]
+FRANJAS_SABADO  = ["07:00", "09:00", "11:00", "15:00"]
 
 FIN_FRANJA = {
-    "07:00": "09:00", "09:00": "11:00", "11:00": "13:00",
-    "18:00": "20:00", "20:00": "22:00"
+    "07:00": "09:00",
+    "09:00": "11:00",
+    "11:00": "13:00",
+    "15:00": "17:00",
+    "18:00": "20:00",
+    "20:00": "22:00",
 }
 
-# OCP: cambiar la regla de especialidad en un solo lugar
+PARES_DIAS_LV = [
+    ("Lunes",     "Miercoles"),
+    ("Martes",    "Jueves"),
+    ("Miercoles", "Viernes"),
+    ("Lunes",     "Jueves"),
+    ("Martes",    "Viernes"),
+]
+
+PARES_DIAS_SABADO = [("Sabado", "Sabado")]
+
+FRANJAS_POR_JORNADA = {
+    "manana": FRANJAS_MANANA,
+    "noche":  FRANJAS_NOCHE,
+    "sabado": FRANJAS_SABADO,
+}
+
 FACULTAD_A_ESPECIALIDAD = {
     "Sistemas":         "Ingeniería de Sistemas",
     "Ciencias Básicas": "Ciencias Básicas",
@@ -49,7 +67,7 @@ def _hora_display(hora: str) -> str:
 
 
 def _salones_ocupados_en(session: Session, dia: str, hora: str, excluir_grupo: int = 0) -> set:
- 
+    """OCP: consulta salones ocupados revisando AMBAS sesiones."""
     ocup_s1 = session.exec(
         select(Grupo.id_salon).where(
             Grupo.dia  == dia,  Grupo.hora  == hora,
@@ -68,7 +86,7 @@ def _salones_ocupados_en(session: Session, dia: str, hora: str, excluir_grupo: i
 
 
 def _salon_libre(session: Session, pref: str, fallback: str, ocupados: set):
-    """SRP: busca primer salon libre del tipo preferido, o fallback si no hay."""
+    """SRP: busca primer salon libre del tipo preferido, o fallback."""
     q = select(Salon).where(Salon.nombre.like(pref))
     if ocupados:
         q = q.where(Salon.id.not_in(ocupados))
@@ -81,14 +99,28 @@ def _salon_libre(session: Session, pref: str, fallback: str, ocupados: set):
     return sal
 
 
-def _buscar_franja_con_salones(session: Session, prefSal: str, facultad: str):
-
+def _buscar_franja_con_salones(session: Session, prefSal: str, facultad: str, jornada: str = "manana"):
+    """
+    Builder: busca franja libre para 2 sesiones semanales.
+    jornada = 'manana' | 'noche' | 'sabado'
+    Retorna (hora, dia1, id_salon1, dia2, id_salon2) o None.
+    """
     fallback = "AULA-%" if facultad == "Sistemas" else None
 
-    for hora in FRANJAS_HORARIO:
-        for dia1, dia2 in PARES_DIAS:
+    if jornada == "sabado":
+        franjas = FRANJAS_SABADO
+        pares   = PARES_DIAS_SABADO
+    elif jornada == "noche":
+        franjas = FRANJAS_NOCHE
+        pares   = PARES_DIAS_LV
+    else:
+        franjas = FRANJAS_MANANA
+        pares   = PARES_DIAS_LV
+
+    for hora in franjas:
+        for dia1, dia2 in pares:
             ocup1 = _salones_ocupados_en(session, dia1, hora)
-            ocup2 = _salones_ocupados_en(session, dia2, hora)
+            ocup2 = _salones_ocupados_en(session, dia2, hora) if dia2 != dia1 else ocup1
             sal1  = _salon_libre(session, prefSal, fallback, ocup1)
             sal2  = _salon_libre(session, prefSal, fallback, ocup2)
             if sal1 and sal2:
@@ -97,9 +129,6 @@ def _buscar_franja_con_salones(session: Session, prefSal: str, facultad: str):
 
 
 def _buscar_profesor(session: Session, facultad: str):
-    """
-     retorna un profesor de la especialidad correcta 
-    """
     especialidad = FACULTAD_A_ESPECIALIDAD.get(facultad)
     if not especialidad:
         return None
@@ -108,43 +137,17 @@ def _buscar_profesor(session: Session, facultad: str):
     ).first()
 
 
-def _asignar_profe_pendiente(session: Session, facultad: str) -> None:
-    """
-    Recorre todos los grupos sin profesor de esa facultad y les asigna
-    el primer profesor dis
-    """
-    especialidad = FACULTAD_A_ESPECIALIDAD.get(facultad)
-    if not especialidad:
-        return
-    prof = session.exec(
-        select(Profesor).where(Profesor.especialidad == especialidad)
-    ).first()
-    if not prof:
-        return
-    grupos_sin_prof = session.exec(
-        select(Grupo)
-        .join(Materia, Grupo.id_materia == Materia.id)
-        .where(Grupo.id_profesor == None, Materia.facultad == facultad)
-    ).all()
-    for g in grupos_sin_prof:
-        g.id_profesor = prof.id
-        session.add(g)
-    if grupos_sin_prof:
-        session.commit()
-
-
 @router.get("/materias", status_code=200)
 def ListarMaterias(
     sesion: SesionToken = Depends(ObtenerSesAct),
     session: Session = Depends(ObtenerSes)
 ):
-    """
-    Estudiante: solo ve materias de su semestre """
+    """Lista materias. Estudiante: filtra por semestre y prerequisitos."""
     materias = session.exec(select(Materia)).all()
 
-    est             = None
-    aprobadas_ids:  set = set()
-    inscritas_ids:  set = set()
+    est            = None
+    aprobadas_ids: set = set()
+    inscritas_ids: set = set()
 
     if sesion.rol == "Estudiante":
         us = session.exec(
@@ -195,7 +198,6 @@ def ListarMaterias(
     return sorted(resultado, key=lambda x: (x["semestre"], x["nombre"]))
 
 
-
 @router.get("/materias/{id_materia}/grupos", status_code=200)
 def ObtenerGrup(
     id_materia: int,
@@ -206,8 +208,8 @@ def ObtenerGrup(
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada.")
 
-    grupos  = session.exec(select(Grupo).where(Grupo.id_materia == id_materia)).all()
-    limite  = CUPO_POR_FACULTAD.get(materia.facultad, 30)
+    grupos = session.exec(select(Grupo).where(Grupo.id_materia == id_materia)).all()
+    limite = CUPO_POR_FACULTAD.get(materia.facultad, 30)
 
     return [
         {
@@ -226,7 +228,6 @@ def ObtenerGrup(
     ]
 
 
-
 @router.post("/inscribir", status_code=201)
 def InscribirEst(
     data: EsquemaMatric,
@@ -243,7 +244,6 @@ def InscribirEst(
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada.")
 
-    # Validacion 1: semestre
     if est.semestre < materia.semestre:
         raise HTTPException(
             status_code=400,
@@ -252,7 +252,6 @@ def InscribirEst(
                 f"Tu semestre actual es {est.semestre}."
             )
         )
-
 
     if materia.id_prerequisito:
         prereq_mat = session.get(Materia, materia.id_prerequisito)
@@ -273,7 +272,6 @@ def InscribirEst(
                 )
             )
 
-
     if session.exec(
         select(Inscripcion).where(
             Inscripcion.id_estudiante == est.id,
@@ -282,40 +280,40 @@ def InscribirEst(
     ).first():
         raise HTTPException(status_code=409, detail="Ya estas matriculado en esta materia.")
 
-    # Buscar profesor 
     profesorAs = _buscar_profesor(session, materia.facultad)
     id_prof    = profesorAs.id if profesorAs else None
 
     prefSal = FACULTAD_A_SALON.get(materia.facultad, "AULA-%")
     limiteC = CUPO_POR_FACULTAD.get(materia.facultad, 30)
     grupos  = session.exec(select(Grupo).where(Grupo.id_materia == data.id_materia)).all()
+    jornada = data.jornada or "manana"
 
-    # Sin grupos pa crear
-    if not grupos:
-        franja = _buscar_franja_con_salones(session, prefSal, materia.facultad)
+    def _crear_grupo(numero: int) -> Grupo:
+        """SRP: crea grupo con 2 sesiones usando el Builder completo."""
+        franja = _buscar_franja_con_salones(session, prefSal, materia.facultad, jornada)
+        if not franja:
+            franja = _buscar_franja_con_salones(session, prefSal, materia.facultad, "manana")
         if not franja:
             raise HTTPException(
                 status_code=400,
                 detail="No hay franjas horarias disponibles con salones libres para 2 sesiones."
             )
         hora, dia1, id_sal1, dia2, id_sal2 = franja
-
-        grupoEleg = (ConstructorGrup()
-            .conNumero(1)
+        return (ConstructorGrup()
+            .conNumero(numero)
             .conMateria(data.id_materia)
             .conSalon(id_sal1)
             .conProfesor(id_prof)
             .conHorario(dia1, hora)
+            .conSesion2(dia2, hora, id_sal2)
             .construir())
-        grupoEleg.dia2      = dia2
-        grupoEleg.hora2     = hora
-        grupoEleg.id_salon2 = id_sal2
 
+    if not grupos:
+        grupoEleg = _crear_grupo(1)
         session.add(grupoEleg)
         session.commit()
         session.refresh(grupoEleg)
         inscritos = 0
-
     else:
         if data.id_grupo:
             grupoEleg = session.get(Grupo, data.id_grupo)
@@ -328,26 +326,8 @@ def InscribirEst(
             select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == grupoEleg.id)
         ).one()
 
-    # Grupo lleno: abrir nuevo grupo
     if inscritos >= limiteC:
-        franja = _buscar_franja_con_salones(session, prefSal, materia.facultad)
-        if not franja:
-            raise HTTPException(
-                status_code=400,
-                detail="No hay salones disponibles para aperturar un nuevo grupo."
-            )
-        hora, dia1, id_sal1, dia2, id_sal2 = franja
-        nuevoGrup = (ConstructorGrup()
-            .conNumero(len(grupos) + 1)
-            .conMateria(data.id_materia)
-            .conSalon(id_sal1)
-            .conProfesor(id_prof)
-            .conHorario(dia1, hora)
-            .construir())
-        nuevoGrup.dia2      = dia2
-        nuevoGrup.hora2     = hora
-        nuevoGrup.id_salon2 = id_sal2
-
+        nuevoGrup = _crear_grupo(len(grupos) + 1)
         session.add(nuevoGrup)
         session.commit()
         session.refresh(nuevoGrup)
@@ -363,7 +343,6 @@ def InscribirEst(
             id_grupo=nuevoGrup.id, estado="Activo", aprobada=None
         ))
         session.commit()
-
         aviso = "" if id_prof else " (sin profesor aun, se asignara automaticamente)"
         return {"alerta": False, "mensaje": f"Matricula exitosa. Se aperturo la seccion {nuevoGrup.num_grupo}.{aviso}"}
 
@@ -372,7 +351,6 @@ def InscribirEst(
         id_grupo=grupoEleg.id, estado="Activo", aprobada=None
     ))
     session.commit()
-
     aviso = "" if grupoEleg.id_profesor else " (sin profesor aun, se asignara automaticamente)"
     return {"alerta": False, "mensaje": f"Matricula exitosa en el Grupo {grupoEleg.num_grupo}.{aviso}"}
 
