@@ -4,14 +4,10 @@ from sqlmodel import Session, select, func
 from modelos.entidades import Grupo, Inscripcion
 
 
-# ── Interface Segregation (I): observer con un solo método ──
-
 class IObservador(ABC):
     @abstractmethod
     def actualizar(self, evento: str, datos: dict) -> None: pass
 
-
-# ── Single Responsibility (S): GestorEv solo gestiona suscriptores ──
 
 class GestorEv:
     def __init__(self):
@@ -26,22 +22,11 @@ class GestorEv:
             obs.actualizar(evento, datos)
 
 
-class ObservadorIA(IObservador):
-    def actualizar(self, evento: str, datos: dict) -> None:
-        if evento == "CAMBIO_SALON":
-            ses = datos.get("session")
-            if ses:
-                from servicios.optimizador import OptimizadorAud, ComponenteAlg
-                OptimizadorAud(ComponenteAlg()).ejecutar(ses)
-
-
 class ObservadorCon(IObservador):
+
     def actualizar(self, evento: str, datos: dict) -> None:
-        if evento == "CAMBIO_SALON":
-            pass
+        pass
 
-
-# ── Strategy (Comportamental): estrategias de asignación intercambiables ──
 
 class IEstrategiaAs(ABC):
     @abstractmethod

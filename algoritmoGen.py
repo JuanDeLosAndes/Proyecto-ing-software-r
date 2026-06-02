@@ -4,135 +4,174 @@ from modelos.entidades import Grupo, Salon, Materia, Inscripcion
 
 
 class ConfigAlg:
+
     POBLACION    = 50
     GENERACIONES = 80
     MUTACION     = 0.15
+    ELITE        = 10
 
 
-# SRP: calculo de fitness aislado y documentado
-def CalcularFit(cromosoma, gruposInf, salonesInf):
-    """
-    cromosoma = { id_grupo: (id_salon1, id_salon2) }
-    Penaliza: capacidad excedida, facultad incorrecta,
-              choque salon sesion1, choque salon sesion2,
-              choque profesor ambas sesiones.
-    """
+def CalcularFit(cromosoma: dict, gruposInf: dict, salonesInf: dict) -> int:
+ 
     penalizacion = 0
-    choqueSal  = {}  # (salon, dia, hora) -> id_grupo
-    choqueProf = {}  # (id_prof, dia, hora) -> id_grupo
+    choqueSal:  dict = {}
+    choqueProf: dict = {}
 
     for idGrupo, (idSalon, idSalon2) in cromosoma.items():
-        gData = gruposInf[idGrupo]
+        gData = gruposInf.get(idGrupo)
+        if not gData:
+            continue
+
         salon = salonesInf.get(idSalon)
         if not salon:
             continue
 
-        # ── Sesion 1 ──
         if gData["inscritos"] > salon.capacidad:
             penalizacion += 5000
-        if gData["facultad"] == "Sistemas" and "Sala" not in salon.nombre:
-            penalizacion += 500
-        if gData["facultad"] == "Ciencias Básicas" and "AULA" not in salon.nombre:
+        if gData["facultad"] == "Ciencias Básicas" and "Sala" in salon.nombre:
             penalizacion += 6000
+        elif gData["facultad"] == "Sistemas" and "AULA" in salon.nombre:
+            penalizacion += 500
 
-        llave1 = (idSalon, gData["dia"], gData["hora"])
-        penalizacion += 4000 if llave1 in choqueSal else 0
-        choqueSal.setdefault(llave1, idGrupo)
+        llave_sal1 = (idSalon, gData["dia"], gData["hora"])
+        if llave_sal1 in choqueSal:
+            penalizacion += 4000
+        else:
+            choqueSal[llave_sal1] = idGrupo
 
-        llaveP1 = (gData["id_profesor"], gData["dia"], gData["hora"])
-        penalizacion += 5000 if llaveP1 in choqueProf else 0
-        choqueProf.setdefault(llaveP1, idGrupo)
+        if gData["id_profesor"]:
+            llave_prof1 = (gData["id_profesor"], gData["dia"], gData["hora"])
+            if llave_prof1 in choqueProf:
+                penalizacion += 5000
+            else:
+                choqueProf[llave_prof1] = idGrupo
 
-        # ── Sesion 2 (si el grupo tiene segunda sesion) ──
         if idSalon2 and gData.get("dia2") and gData.get("hora2"):
             salon2 = salonesInf.get(idSalon2)
-            if salon2:
-                if gData["inscritos"] > salon2.capacidad:
+            if not salon2:
+                continue
+
+            if gData["inscritos"] > salon2.capacidad:
+                penalizacion += 5000
+            if gData["facultad"] == "Ciencias Básicas" and "Sala" in salon2.nombre:
+                penalizacion += 6000
+            elif gData["facultad"] == "Sistemas" and "AULA" in salon2.nombre:
+                penalizacion += 500
+
+            llave_sal2 = (idSalon2, gData["dia2"], gData["hora2"])
+            if llave_sal2 in choqueSal:
+                penalizacion += 4000
+            else:
+                choqueSal[llave_sal2] = idGrupo
+
+            if gData["id_profesor"]:
+                llave_prof2 = (gData["id_profesor"], gData["dia2"], gData["hora2"])
+                if llave_prof2 in choqueProf:
                     penalizacion += 5000
-                if gData["facultad"] == "Sistemas" and "Sala" not in salon2.nombre:
-                    penalizacion += 500
-                if gData["facultad"] == "Ciencias Básicas" and "AULA" not in salon2.nombre:
-                    penalizacion += 6000
-
-                llave2 = (idSalon2, gData["dia2"], gData["hora2"])
-                penalizacion += 4000 if llave2 in choqueSal else 0
-                choqueSal.setdefault(llave2, idGrupo)
-
-                llaveP2 = (gData["id_profesor"], gData["dia2"], gData["hora2"])
-                penalizacion += 5000 if llaveP2 in choqueProf else 0
-                choqueProf.setdefault(llaveP2, idGrupo)
+                else:
+                    choqueProf[llave_prof2] = idGrupo
 
     return max(0, 10000 - penalizacion)
 
 
-def GenerarPob(gruposIds, salonesIds):
-    """
-    Factory Method implicito: cada cromosoma es un dict
-    { id_grupo: (salon1, salon2) }.
-    """
+def _GenerarPob(gruposIds: list, salonesIdsSis: list, salonesIdsBasic: list,
+                gruposInf: dict) -> list:
     pob = []
     for _ in range(ConfigAlg.POBLACION):
-        crom = {
-            idG: (random.choice(salonesIds), random.choice(salonesIds))
-            for idG in gruposIds
-        }
+        crom = {}
+        for idG in gruposIds:
+            facultad = gruposInf[idG]["facultad"]
+            if facultad == "Sistemas" and salonesIdsSis:
+                opciones = salonesIdsSis
+            elif facultad == "Ciencias Básicas" and salonesIdsBasic:
+                opciones = salonesIdsBasic
+            else:
+                opciones = salonesIdsSis + salonesIdsBasic
+            crom[idG] = (random.choice(opciones), random.choice(opciones))
         pob.append(crom)
     return pob
 
 
-def EjecutarAlg(session: Session):
+def _Cruzar(p1: dict, p2: dict, gruposIds: list) -> dict:
+    corte = len(gruposIds) // 2
+    return {
+        idG: (p1[idG][0] if idx < corte else p2[idG][0],
+              p1[idG][1] if idx < corte else p2[idG][1])
+        for idx, idG in enumerate(gruposIds)
+    }
+
+
+def _Mutar(crom: dict, gruposIds: list, salonesIdsSis: list,
+           salonesIdsBasic: list, gruposInf: dict) -> dict:
+    idG_mut  = random.choice(gruposIds)
+    facultad = gruposInf[idG_mut]["facultad"]
+    if facultad == "Sistemas" and salonesIdsSis:
+        opciones = salonesIdsSis
+    elif facultad == "Ciencias Básicas" and salonesIdsBasic:
+        opciones = salonesIdsBasic
+    else:
+        opciones = salonesIdsSis + salonesIdsBasic
+    crom[idG_mut] = (random.choice(opciones), random.choice(opciones))
+    return crom
+
+
+def EjecutarAlg(session: Session) -> dict:
+
     salones = session.exec(select(Salon)).all()
     grupos  = session.exec(select(Grupo)).all()
 
     if not salones or not grupos:
-        return {"error": "Infraestructura o grupos insuficientes."}
+        return {"error": "No hay salones o grupos en la base de datos."}
 
-    salonesInf = {s.id: s for s in salones}
-    salonesIds = list(salonesInf.keys())
-    gruposIds  = [g.id for g in grupos]
+    salonesInf      = {s.id: s for s in salones}
+    salonesIdsSis   = [s.id for s in salones if "Sala" in s.nombre]
+    salonesIdsBasic = [s.id for s in salones if "AULA" in s.nombre]
+    gruposIds       = [g.id for g in grupos]
 
-    gruposInf = {}
+    gruposInf: dict = {}
     for g in grupos:
-        materia    = session.get(Materia, g.id_materia)
-        inscritosC = session.exec(
+        materia   = session.get(Materia, g.id_materia)
+        inscritos = session.exec(
             select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == g.id)
         ).one()
         gruposInf[g.id] = {
             "dia":        g.dia,  "hora":  g.hora,
             "dia2":       g.dia2, "hora2": g.hora2,
             "facultad":   materia.facultad if materia else "Ciencias Básicas",
-            "inscritos":  inscritosC,
-            "id_profesor": g.id_profesor
+            "inscritos":  inscritos,
+            "id_profesor": g.id_profesor,
         }
 
-    pob = GenerarPob(gruposIds, salonesIds)
+    pob = _GenerarPob(gruposIds, salonesIdsSis, salonesIdsBasic, gruposInf)
 
     for _ in range(ConfigAlg.GENERACIONES):
         pob = sorted(pob, key=lambda c: CalcularFit(c, gruposInf, salonesInf), reverse=True)
-        nuevaGen = pob[:10]
-        while len(nuevaGen) < ConfigAlg.POBLACION:
-            p1 = random.choice(pob[:20])
-            p2 = random.choice(pob[:20])
-            corte = len(gruposIds) // 2
-            hijo = {
-                idG: (p1[idG][0] if idx < corte else p2[idG][0],
-                       p1[idG][1] if idx < corte else p2[idG][1])
-                for idx, idG in enumerate(gruposIds)
-            }
+        nueva_gen = pob[:ConfigAlg.ELITE]
+        while len(nueva_gen) < ConfigAlg.POBLACION:
+            p1   = random.choice(pob[:20])
+            p2   = random.choice(pob[:20])
+            hijo = _Cruzar(p1, p2, gruposIds)
             if random.random() < ConfigAlg.MUTACION:
-                idG_mut = random.choice(gruposIds)
-                hijo[idG_mut] = (random.choice(salonesIds), random.choice(salonesIds))
-            nuevaGen.append(hijo)
-        pob = nuevaGen
+                hijo = _Mutar(hijo, gruposIds, salonesIdsSis, salonesIdsBasic, gruposInf)
+            nueva_gen.append(hijo)
+        pob = nueva_gen
 
-    mejorCrom = max(pob, key=lambda c: CalcularFit(c, gruposInf, salonesInf))
+    mejor     = max(pob, key=lambda c: CalcularFit(c, gruposInf, salonesInf))
+    fit_final = CalcularFit(mejor, gruposInf, salonesInf)
 
-    for idGrupo, (idSal1, idSal2) in mejorCrom.items():
-        grupoDB = session.get(Grupo, idGrupo)
-        if grupoDB:
-            grupoDB.id_salon  = idSal1
-            grupoDB.id_salon2 = idSal2
-            session.add(grupoDB)
-
+    cambios = 0
+    for idGrupo, (idSal1, idSal2) in mejor.items():
+        g = session.get(Grupo, idGrupo)
+        if g:
+            g.id_salon  = idSal1
+            g.id_salon2 = idSal2
+            session.add(g)
+            cambios += 1
     session.commit()
-    return {"mensaje": "Optimizacion genetica completada. Sin cruces criticos detectados."}
+
+    return {
+        "mensaje":            "Optimizacion genetica completada.",
+        "fitness":            fit_final,
+        "grupos_actualizados": cambios,
+        "optimo":             fit_final == 10000,
+    }

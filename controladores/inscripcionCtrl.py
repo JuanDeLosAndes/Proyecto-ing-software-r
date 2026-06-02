@@ -12,11 +12,8 @@ from servicios.sesiones import ObtenerSesAct
 
 router = APIRouter()
 
-# ── Reglas de horario (SRP: constantes aisladas, no dispersas en el codigo) ──
-# Franjas de 2 horas: manana 7-13, noche 18-22
 FRANJAS_HORARIO = ["07:00", "09:00", "11:00", "18:00", "20:00"]
 
-# Pares de dias para las 2 sesiones semanales
 PARES_DIAS = [
     ("Lunes",    "Miercoles"),
     ("Martes",   "Jueves"),
@@ -30,17 +27,29 @@ FIN_FRANJA = {
     "18:00": "20:00", "20:00": "22:00"
 }
 
+# OCP: cambiar la regla de especialidad en un solo lugar
+FACULTAD_A_ESPECIALIDAD = {
+    "Sistemas":         "Ingeniería de Sistemas",
+    "Ciencias Básicas": "Ciencias Básicas",
+}
+
+FACULTAD_A_SALON = {
+    "Sistemas":         "Sala de Computo%",
+    "Ciencias Básicas": "AULA-%",
+}
+
+CUPO_POR_FACULTAD = {
+    "Sistemas":         30,
+    "Ciencias Básicas": 35,
+}
+
 
 def _hora_display(hora: str) -> str:
-    """Formatea "07:00" -> "07:00 - 09:00" para mostrar en el horario."""
     return f"{hora} - {FIN_FRANJA.get(hora, hora)}"
 
 
-def _salones_ocupados_en(session: Session, dia: str, hora: str, excluir_grupo: int = 0):
-    """
-    OCP: funcion unica para consultar salones ocupados en una franja,
-    revisando AMBAS sesiones de todos los grupos.
-    """
+def _salones_ocupados_en(session: Session, dia: str, hora: str, excluir_grupo: int = 0) -> set:
+ 
     ocup_s1 = session.exec(
         select(Grupo.id_salon).where(
             Grupo.dia  == dia,  Grupo.hora  == hora,
@@ -58,48 +67,70 @@ def _salones_ocupados_en(session: Session, dia: str, hora: str, excluir_grupo: i
     return {x for x in (ocup_s1 + ocup_s2) if x}
 
 
+def _salon_libre(session: Session, pref: str, fallback: str, ocupados: set):
+    """SRP: busca primer salon libre del tipo preferido, o fallback si no hay."""
+    q = select(Salon).where(Salon.nombre.like(pref))
+    if ocupados:
+        q = q.where(Salon.id.not_in(ocupados))
+    sal = session.exec(q).first()
+    if not sal and fallback:
+        q2 = select(Salon).where(Salon.nombre.like(fallback))
+        if ocupados:
+            q2 = q2.where(Salon.id.not_in(ocupados))
+        sal = session.exec(q2).first()
+    return sal
+
+
 def _buscar_franja_con_salones(session: Session, prefSal: str, facultad: str):
-    """
-    Builder: busca la primera franja horaria (hora + par de dias)
-    que tenga salones libres para ambas sesiones.
-    Retorna (hora, dia1, id_salon1, dia2, id_salon2) o None.
-    """
+
+    fallback = "AULA-%" if facultad == "Sistemas" else None
+
     for hora in FRANJAS_HORARIO:
         for dia1, dia2 in PARES_DIAS:
             ocup1 = _salones_ocupados_en(session, dia1, hora)
             ocup2 = _salones_ocupados_en(session, dia2, hora)
-
-            q1 = select(Salon).where(Salon.nombre.like(prefSal))
-            if ocup1:
-                q1 = q1.where(Salon.id.not_in(ocup1))
-            sal1 = session.exec(q1).first()
-
-            if not sal1:
-                if facultad == "Sistemas":
-                    q1b = select(Salon).where(Salon.nombre.like("AULA-%"))
-                    if ocup1:
-                        q1b = q1b.where(Salon.id.not_in(ocup1))
-                    sal1 = session.exec(q1b).first()
-                if not sal1:
-                    continue
-
-            q2 = select(Salon).where(Salon.nombre.like(prefSal))
-            if ocup2:
-                q2 = q2.where(Salon.id.not_in(ocup2))
-            sal2 = session.exec(q2).first()
-
-            if not sal2:
-                if facultad == "Sistemas":
-                    q2b = select(Salon).where(Salon.nombre.like("AULA-%"))
-                    if ocup2:
-                        q2b = q2b.where(Salon.id.not_in(ocup2))
-                    sal2 = session.exec(q2b).first()
-                if not sal2:
-                    continue
-
-            return hora, dia1, sal1.id, dia2, sal2.id
-
+            sal1  = _salon_libre(session, prefSal, fallback, ocup1)
+            sal2  = _salon_libre(session, prefSal, fallback, ocup2)
+            if sal1 and sal2:
+                return hora, dia1, sal1.id, dia2, sal2.id
     return None
+
+
+def _buscar_profesor(session: Session, facultad: str):
+    """
+     retorna un profesor de la especialidad correcta 
+    """
+    especialidad = FACULTAD_A_ESPECIALIDAD.get(facultad)
+    if not especialidad:
+        return None
+    return session.exec(
+        select(Profesor).where(Profesor.especialidad == especialidad)
+    ).first()
+
+
+def _asignar_profe_pendiente(session: Session, facultad: str) -> None:
+    """
+    Recorre todos los grupos sin profesor de esa facultad y les asigna
+    el primer profesor dis
+    """
+    especialidad = FACULTAD_A_ESPECIALIDAD.get(facultad)
+    if not especialidad:
+        return
+    prof = session.exec(
+        select(Profesor).where(Profesor.especialidad == especialidad)
+    ).first()
+    if not prof:
+        return
+    grupos_sin_prof = session.exec(
+        select(Grupo)
+        .join(Materia, Grupo.id_materia == Materia.id)
+        .where(Grupo.id_profesor == None, Materia.facultad == facultad)
+    ).all()
+    for g in grupos_sin_prof:
+        g.id_profesor = prof.id
+        session.add(g)
+    if grupos_sin_prof:
+        session.commit()
 
 
 @router.get("/materias", status_code=200)
@@ -107,20 +138,62 @@ def ListarMaterias(
     sesion: SesionToken = Depends(ObtenerSesAct),
     session: Session = Depends(ObtenerSes)
 ):
-    """Lista el pensum con semestre y prerequisito. Jinja2: usado en asignacion.html."""
+    """
+    Estudiante: solo ve materias de su semestre """
     materias = session.exec(select(Materia)).all()
+
+    est             = None
+    aprobadas_ids:  set = set()
+    inscritas_ids:  set = set()
+
+    if sesion.rol == "Estudiante":
+        us = session.exec(
+            select(Usuario).where(Usuario.codigo == sesion.codigo_usuario)
+        ).first()
+        if us:
+            est = session.exec(
+                select(Estudiante).where(Estudiante.id_usuario == us.id)
+            ).first()
+        if est:
+            aprobadas_ids = {
+                i.id_materia
+                for i in session.exec(
+                    select(Inscripcion).where(
+                        Inscripcion.id_estudiante == est.id,
+                        Inscripcion.aprobada == True
+                    )
+                ).all()
+            }
+            inscritas_ids = {
+                i.id_materia
+                for i in session.exec(
+                    select(Inscripcion).where(Inscripcion.id_estudiante == est.id)
+                ).all()
+            }
+
     resultado = []
     for m in materias:
-        prereq = None
+        prereq_nombre = None
         if m.id_prerequisito:
             pm = session.get(Materia, m.id_prerequisito)
-            prereq = pm.nombre if pm else None
+            prereq_nombre = pm.nombre if pm else None
+
+        if est:
+            if m.semestre > est.semestre:
+                continue
+            if m.id in inscritas_ids:
+                continue
+            if m.id_prerequisito and m.id_prerequisito not in aprobadas_ids:
+                continue
+
         resultado.append({
             "id": m.id, "nombre": m.nombre,
             "creditos": m.creditos, "facultad": m.facultad,
-            "semestre": m.semestre, "prerequisito": prereq
+            "semestre": m.semestre, "prerequisito": prereq_nombre
         })
+
     return sorted(resultado, key=lambda x: (x["semestre"], x["nombre"]))
+
 
 
 @router.get("/materias/{id_materia}/grupos", status_code=200)
@@ -133,14 +206,16 @@ def ObtenerGrup(
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada.")
 
-    grupos = session.exec(select(Grupo).where(Grupo.id_materia == id_materia)).all()
-    limite = 30 if materia.facultad == "Sistemas" else 35
+    grupos  = session.exec(select(Grupo).where(Grupo.id_materia == id_materia)).all()
+    limite  = CUPO_POR_FACULTAD.get(materia.facultad, 30)
 
     return [
         {
             "id_grupo":  g.id,
             "num_grupo": g.num_grupo,
-            "sesion_1":  f"{g.dia} {_hora_display(g.hora)}"  if g.dia  and g.hora  else "Sin asignar",
+            "profesor":  session.get(Profesor, g.id_profesor).nombre
+                         if g.id_profesor else "Sin asignar",
+            "sesion_1":  f"{g.dia} {_hora_display(g.hora)}"   if g.dia  and g.hora  else "Sin asignar",
             "sesion_2":  f"{g.dia2} {_hora_display(g.hora2)}" if g.dia2 and g.hora2 else "Sin asignar",
             "inscritos": session.exec(
                 select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == g.id)
@@ -149,6 +224,7 @@ def ObtenerGrup(
         }
         for g in grupos
     ]
+
 
 
 @router.post("/inscribir", status_code=201)
@@ -167,7 +243,7 @@ def InscribirEst(
     if not materia:
         raise HTTPException(status_code=404, detail="Materia no encontrada.")
 
-    # ── Validacion 1: semestre del estudiante ──
+    # Validacion 1: semestre
     if est.semestre < materia.semestre:
         raise HTTPException(
             status_code=400,
@@ -177,7 +253,7 @@ def InscribirEst(
             )
         )
 
-    # ── Validacion 2: prerequisito de Ciencias Basicas ──
+
     if materia.id_prerequisito:
         prereq_mat = session.get(Materia, materia.id_prerequisito)
         prereq_ok  = session.exec(
@@ -191,10 +267,13 @@ def InscribirEst(
             nombre_pre = prereq_mat.nombre if prereq_mat else f"ID {materia.id_prerequisito}"
             raise HTTPException(
                 status_code=400,
-                detail=f"Prerequisito no cumplido: debes aprobar '{nombre_pre}' antes de inscribir '{materia.nombre}'."
+                detail=(
+                    f"Prerequisito no cumplido: debes aprobar '{nombre_pre}' "
+                    f"antes de inscribir '{materia.nombre}'."
+                )
             )
 
-    # ── Validacion 3: no duplicar ──
+
     if session.exec(
         select(Inscripcion).where(
             Inscripcion.id_estudiante == est.id,
@@ -203,17 +282,15 @@ def InscribirEst(
     ).first():
         raise HTTPException(status_code=409, detail="Ya estas matriculado en esta materia.")
 
-    # ── Asignacion automatica de profesor ──
-    especReq   = "Ingeniería de Sistemas" if materia.facultad == "Sistemas" else "Ciencias Básicas"
-    profesorAs = session.exec(select(Profesor).where(Profesor.especialidad == especReq)).first()
-    if not profesorAs:
-        raise HTTPException(status_code=400, detail="No hay profesores con la especialidad requerida.")
+    # Buscar profesor 
+    profesorAs = _buscar_profesor(session, materia.facultad)
+    id_prof    = profesorAs.id if profesorAs else None
 
+    prefSal = FACULTAD_A_SALON.get(materia.facultad, "AULA-%")
+    limiteC = CUPO_POR_FACULTAD.get(materia.facultad, 30)
     grupos  = session.exec(select(Grupo).where(Grupo.id_materia == data.id_materia)).all()
-    limiteC = 30 if materia.facultad == "Sistemas" else 35
-    prefSal = "Sala de Computo%" if materia.facultad == "Sistemas" else "AULA-%"
 
-    # ── Crear nuevo grupo con 2 sesiones automaticas ──
+    # Sin grupos pa crear
     if not grupos:
         franja = _buscar_franja_con_salones(session, prefSal, materia.facultad)
         if not franja:
@@ -227,12 +304,11 @@ def InscribirEst(
             .conNumero(1)
             .conMateria(data.id_materia)
             .conSalon(id_sal1)
-            .conProfesor(profesorAs.id)
+            .conProfesor(id_prof)
             .conHorario(dia1, hora)
             .construir())
-        # Asignar sesion 2
         grupoEleg.dia2      = dia2
-        grupoEleg.hora2     = hora   # misma franja horaria, dia diferente
+        grupoEleg.hora2     = hora
         grupoEleg.id_salon2 = id_sal2
 
         session.add(grupoEleg)
@@ -247,22 +323,25 @@ def InscribirEst(
                 raise HTTPException(status_code=400, detail="El grupo seleccionado no es valido para esta materia.")
         else:
             grupoEleg = ContextoIns(EstrategiaVac()).seleccionar(list(grupos), session)
+
         inscritos = session.exec(
             select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == grupoEleg.id)
         ).one()
 
-    # ── Apertura de nueva seccion si el grupo esta lleno ──
+    # Grupo lleno: abrir nuevo grupo
     if inscritos >= limiteC:
         franja = _buscar_franja_con_salones(session, prefSal, materia.facultad)
         if not franja:
-            raise HTTPException(status_code=400, detail="No hay salones disponibles para aperturar un nuevo grupo.")
-
+            raise HTTPException(
+                status_code=400,
+                detail="No hay salones disponibles para aperturar un nuevo grupo."
+            )
         hora, dia1, id_sal1, dia2, id_sal2 = franja
         nuevoGrup = (ConstructorGrup()
             .conNumero(len(grupos) + 1)
             .conMateria(data.id_materia)
             .conSalon(id_sal1)
-            .conProfesor(profesorAs.id)
+            .conProfesor(id_prof)
             .conHorario(dia1, hora)
             .construir())
         nuevoGrup.dia2      = dia2
@@ -284,14 +363,18 @@ def InscribirEst(
             id_grupo=nuevoGrup.id, estado="Activo", aprobada=None
         ))
         session.commit()
-        return {"alerta": False, "mensaje": f"Matricula exitosa. Se aperturo la seccion {nuevoGrup.num_grupo}."}
+
+        aviso = "" if id_prof else " (sin profesor aun, se asignara automaticamente)"
+        return {"alerta": False, "mensaje": f"Matricula exitosa. Se aperturo la seccion {nuevoGrup.num_grupo}.{aviso}"}
 
     session.add(Inscripcion(
         id_estudiante=est.id, id_materia=data.id_materia,
         id_grupo=grupoEleg.id, estado="Activo", aprobada=None
     ))
     session.commit()
-    return {"alerta": False, "mensaje": f"Matricula exitosa en el Grupo {grupoEleg.num_grupo}."}
+
+    aviso = "" if grupoEleg.id_profesor else " (sin profesor aun, se asignara automaticamente)"
+    return {"alerta": False, "mensaje": f"Matricula exitosa en el Grupo {grupoEleg.num_grupo}.{aviso}"}
 
 
 @router.put("/inscripcion/{id_inscripcion}/estado", status_code=200)

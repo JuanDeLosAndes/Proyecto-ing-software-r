@@ -5,17 +5,13 @@ from modelos.entidades import (
     Grupo, Materia, Salon, Inscripcion,
     Usuario, Profesor, SesionToken
 )
-from servicios.eventos import GestorEv, ObservadorIA, ObservadorCon
+from servicios.eventos import GestorEv, ObservadorCon
 from servicios.sesiones import ObtenerSesAct
 
 router = APIRouter()
 
 
-def _ocupados_en(session: Session, dia: str, hora: str, excluir_id: int):
-    """
-    OCP: funcion cerrada para obtener salones ocupados en una franja,
-    revisando sesion 1 y sesion 2 de todos los grupos (menos el que se edita).
-    """
+def _ocupados_en(session: Session, dia: str, hora: str, excluir_id: int) -> set:
     s1 = session.exec(
         select(Grupo.id_salon).where(
             Grupo.dia  == dia, Grupo.hora  == hora,
@@ -31,17 +27,26 @@ def _ocupados_en(session: Session, dia: str, hora: str, excluir_id: int):
     return {x for x in (s1 + s2) if x}
 
 
+def _salon_valido_para_facultad(salon: Salon, facultad: str) -> bool:
+    """
+    Ciencias Basicas solo aulas (nunca Salas de Computo).
+    Sistemas  prefiere salas, puede usar aulas.
+    """
+    if facultad == "Ciencias Básicas" and "Sala" in salon.nombre:
+        return False
+    return True
+
+
 @router.get("/profesor/salones-disponibles/{id_grupo}", status_code=200)
 def ObtenerSal(
     id_grupo: int,
-    num_sesion: int = 1,   # 1 o 2
+    num_sesion: int = 1,
     sesion: SesionToken = Depends(ObtenerSesAct),
     session: Session = Depends(ObtenerSes)
 ):
     """
-    Devuelve salones NO ocupados en la franja horaria del grupo.
-    num_sesion indica si se consulta para sesion 1 o sesion 2.
-    Los salones ya ocupados (en cualquier sesion de cualquier grupo) no aparecen.
+    Filtra ocupados y filtra incompatibles con la facultad:
+    Ciencias Basicas nunca ve Salas de Computo.
     """
     if sesion.rol != "Profesor":
         raise HTTPException(status_code=403, detail="Solo los profesores pueden acceder a esta operacion.")
@@ -50,14 +55,15 @@ def ObtenerSal(
     if not grupo:
         raise HTTPException(status_code=404, detail="Grupo no encontrado.")
 
-    materia = session.get(Materia, grupo.id_materia)
-    dia     = grupo.dia  if num_sesion == 1 else grupo.dia2
-    hora    = grupo.hora if num_sesion == 1 else grupo.hora2
+    materia  = session.get(Materia, grupo.id_materia)
+    dia      = grupo.dia  if num_sesion == 1 else grupo.dia2
+    hora     = grupo.hora if num_sesion == 1 else grupo.hora2
 
     if not dia or not hora:
         raise HTTPException(status_code=400, detail=f"El grupo no tiene sesion {num_sesion} configurada.")
 
     ocupados = _ocupados_en(session, dia, hora, grupo.id)
+    facultad = materia.facultad if materia else None
 
     query = select(Salon)
     if ocupados:
@@ -66,7 +72,7 @@ def ObtenerSal(
     return [
         {"id": s.id, "nombre": s.nombre, "capacidad": s.capacidad}
         for s in session.exec(query).all()
-        if not (materia and materia.facultad == "Ciencias Básicas" and "Sala" in s.nombre)
+        if not facultad or _salon_valido_para_facultad(s, facultad)
     ]
 
 
@@ -74,45 +80,47 @@ def ObtenerSal(
 def CambiarSal(
     id_grupo: int,
     id_nuevo_salon: int,
-    num_sesion: int = 1,   # 1 = cambiar sesion 1, 2 = cambiar sesion 2
+    num_sesion: int = 1,
     sesion: SesionToken = Depends(ObtenerSesAct),
     session: Session = Depends(ObtenerSes)
 ):
     """
-    Permite al profesor cambiar el salon de la sesion 1 o sesion 2.
-    El cambio queda guardado en la BD y los estudiantes lo ven de inmediato.
+    si prof cambia salon
+    Valida compatibilidad de facultad, aforo y disponibilidad.
     """
     if sesion.rol != "Profesor":
         raise HTTPException(status_code=403, detail="Solo los profesores pueden cambiar salones.")
 
-    us      = session.exec(select(Usuario).where(Usuario.codigo == sesion.codigo_usuario)).first()
-    prof    = session.exec(select(Profesor).where(Profesor.id_usuario == us.id)).first()
-    grupo   = session.get(Grupo, id_grupo)
+    us    = session.exec(select(Usuario).where(Usuario.codigo == sesion.codigo_usuario)).first()
+    prof  = session.exec(select(Profesor).where(Profesor.id_usuario == us.id)).first()
+    grupo = session.get(Grupo, id_grupo)
     if not grupo:
         raise HTTPException(status_code=404, detail="Grupo no encontrado.")
+
+    if grupo.id_profesor != prof.id:
+        raise HTTPException(status_code=403, detail="Solo puedes cambiar salones de tus propios grupos.")
 
     materia  = session.get(Materia, grupo.id_materia)
     nuevoSal = session.get(Salon,   id_nuevo_salon)
     if not nuevoSal:
         raise HTTPException(status_code=404, detail="Salon no encontrado.")
 
-    # Reglas de facultad
-    if prof.especialidad == "Ciencias Básicas" and "Sala" in nuevoSal.nombre:
-        raise HTTPException(status_code=400, detail="Profesores de Ciencias Basicas no pueden usar salas de computo.")
-    if materia and materia.facultad == "Ciencias Básicas" and "AULA" not in nuevoSal.nombre:
-        raise HTTPException(status_code=400, detail="Las materias de Ciencias Basicas no se dictan en laboratorios.")
+    facultad = materia.facultad if materia else None
+    if facultad and not _salon_valido_para_facultad(nuevoSal, facultad):
+        raise HTTPException(
+            status_code=400,
+            detail="Las materias de Ciencias Basicas no se dictan en Salas de Computo."
+        )
 
-    # Verificar aforo
     inscC = session.exec(
         select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == id_grupo)
     ).one()
     if inscC > nuevoSal.capacidad:
         raise HTTPException(
             status_code=400,
-            detail=f"Aforo excedido: {nuevoSal.capacidad} lugares para {inscC} inscritos."
+            detail=f"Aforo excedido: el salon tiene {nuevoSal.capacidad} lugares para {inscC} inscritos."
         )
 
-    # Verificar que el nuevo salon no este ocupado en esa franja
     dia  = grupo.dia  if num_sesion == 1 else grupo.dia2
     hora = grupo.hora if num_sesion == 1 else grupo.hora2
     if dia and hora:
@@ -123,7 +131,6 @@ def CambiarSal(
                 detail=f"El salon '{nuevoSal.nombre}' ya esta ocupado en {dia} {hora}."
             )
 
-    # Aplicar cambio — persiste en BD (SQLite)
     if num_sesion == 1:
         grupo.id_salon  = nuevoSal.id
     else:
@@ -131,13 +138,16 @@ def CambiarSal(
     session.add(grupo)
     session.commit()
 
-    # Notificar observadores (Patron Observer)
     gestor = GestorEv()
-    gestor.suscribir(ObservadorIA())
     gestor.suscribir(ObservadorCon())
     gestor.NotificarTod("CAMBIO_SALON", {
         "grupo_id": id_grupo, "nuevo_salon_id": id_nuevo_salon,
-        "num_sesion": num_sesion, "session": session
+        "num_sesion": num_sesion
     })
 
-    return {"mensaje": f"Salon de sesion {num_sesion} actualizado. Los estudiantes del grupo veran el cambio de inmediato."}
+    return {
+        "mensaje": (
+            f"Salon de sesion {num_sesion} actualizado a '{nuevoSal.nombre}'. "
+            "Los estudiantes del grupo veran el cambio de inmediato."
+        )
+    }
