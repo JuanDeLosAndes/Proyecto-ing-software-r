@@ -41,9 +41,6 @@
         <button class="sb-btn" onclick="mostrarSeccion('salones', this)">
           Cambiar Salon
         </button>
-        <button class="sb-btn" onclick="mostrarSeccion('calificar', this)">
-          Calificar Inscripcion
-        </button>
       {% elif rol == 'Administrador' %}
         <button id="sb-opt" class="sb-btn" onclick="mostrarSeccion('optimizar', this)">
           Optimizar Horarios
@@ -88,7 +85,6 @@
       inscribir: renderInscribir,
       materias:  renderMaterias,
       salones:   renderSalones,
-      calificar: renderCalificar,
       optimizar: renderOptimizar,
       bd:        renderBD,
       mer:       renderMER,
@@ -369,12 +365,15 @@
   }
 
   async function apiGet(url) {
-    const r = await fetch(`${API}${url}?token=${TOKEN}`);
+    const separador = url.includes('?') ? '&' : '?';
+    const r = await fetch(`${API}${url}${separador}token=${TOKEN}`);
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || 'Error del servidor.'); }
     return r.json();
   }
+
   async function apiPost(url, body) {
-    const r = await fetch(`${API}${url}?token=${TOKEN}`, {
+    const separador = url.includes('?') ? '&' : '?';
+    const r = await fetch(`${API}${url}${separador}token=${TOKEN}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
@@ -382,8 +381,10 @@
     if (!r.ok) throw new Error(d.detail || 'Error del servidor.');
     return d;
   }
+
   async function apiPut(url) {
-    const r = await fetch(`${API}${url}&token=${TOKEN}`, { method: 'PUT' });
+    const separador = url.includes('?') ? '&' : '?';
+    const r = await fetch(`${API}${url}${separador}token=${TOKEN}`, { method: 'PUT' });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || 'Error del servidor.');
     return d;
@@ -522,7 +523,7 @@ async function renderHorario() {
       const gs = await apiGet(`/materias/${idM}/grupos`);
       if (!gs.length) {
         res.innerHTML = `<p style="color:var(--c-txts);margin-top:12px;">Sin grupos existentes. Se creara uno al inscribirse.</p>
-          <button class="btn-ok" style="margin-top:10px;" onclick="inscribirse(${idM},null,jornada)">Inscribirse (grupo automatico)</button>`;
+          <button class="btn-ok" style="margin-top:10px;" onclick="inscribirse(${idM},null,'${jornada}')">Inscribirse (grupo automatico)</button>`;
         return;
       }
       const filas = gs.map(g => `
@@ -530,7 +531,7 @@ async function renderHorario() {
           <td>Grupo ${g.num_grupo}</td>
           <td>${g.dia||'-'}</td><td>${g.hora||'-'}</td>
           <td><span class="badge ${g.inscritos<g.limite?'badge-ok':'badge-err'}">${g.inscritos}/${g.limite}</span></td>
-          <td><button class="btn-ok" onclick="inscribirse(${idM},${g.id_grupo},jornada)">Elegir</button></td>
+          <td><button class="btn-ok" onclick="inscribirse(${idM}, ${g.id_grupo}, '${jornada}')">Elegir</button></td>
         </tr>`).join('');
       res.innerHTML = `
         <div class="tbl-wrap" style="margin-top:12px;">
@@ -539,7 +540,7 @@ async function renderHorario() {
             <tbody>${filas}</tbody>
           </table>
         </div>
-        <button class="btn-s" style="margin-top:12px;" onclick="inscribirse(${idM},null,jornada)">Asignar automaticamente</button>`;
+        <button class="btn-s" style="margin-top:12px;" onclick="inscribirse(${idM}, null, '${jornada}')">Asignar automaticamente</button>`;
     } catch(e) {
       res.innerHTML = '';
       ae.className = 'alerta err'; ae.innerText = e.message;
@@ -559,36 +560,79 @@ async function renderHorario() {
     }
   }
 
-  /* ══ CAMBIAR SALON (Profesor) ════════════════════════════════════ */
-  function renderSalones() {
+ /* ══ CAMBIAR SALON (Profesor) ════════════════════════════════════ */
+/* ══ CAMBIAR SALON (Profesor) ════════════════════════════════════ */
+async function renderSalones() {
     contenido(panel('Cambiar Salon de Grupo',
       `<div id="ae" class="alerta"></div>
        <div id="ao" class="alerta"></div>
-       <div class="frm-fila">
-         <input type="number" id="id-grp" class="campo" placeholder="ID del grupo" min="1">
-         <button class="btn-p" onclick="buscarSalones()" style="width:auto;">Ver Salones Disponibles</button>
-       </div>
-       <div id="salones-res"></div>`
+       <div class="cargando">Cargando tus grupos...</div>`
     ));
+    try {
+      const h = await apiGet('/horarios');
+      const grupos = [];
+      
+      for (const franja of Object.values(h)) {
+        for (const dia of Object.values(franja)) {
+          // 1. Validamos que 'dia' exista y tenga un id_grupo asignado
+          if (dia && dia.id_grupo) {
+            // 2. Buscamos el nombre correcto de la variable, con fallback a 1
+            const numeroSesion = dia.num_sesion || dia.sesion || 1; 
+
+            // 3. Filtramos para no duplicar en la tabla
+            if (!grupos.find(g => g.id_grupo === dia.id_grupo && g.numero_sesion_segura === numeroSesion)) {
+              dia.numero_sesion_segura = numeroSesion; // Guardamos un valor seguro
+              grupos.push(dia);
+            }
+          }
+        }
+      }
+
+      if (!grupos.length) {
+        document.getElementById('contenido-app').querySelector('.cargando').outerHTML =
+          `<p style="color:var(--c-txts);margin-top:12px;">No tienes grupos asignados actualmente.</p>`;
+        return;
+      }
+
+      // 4. Inyectamos la variable segura en el botón
+      const filas = grupos.map(g => `
+        <tr>
+          <td>${g.materia}</td>
+          <td>${g.salon_nombre || '-'}</td>
+          <td>Sesion ${g.numero_sesion_segura}</td>
+          <td><button class="btn-ok" onclick="verSalonesDeGrupo(${g.id_grupo}, ${g.numero_sesion_segura})">Ver salones disponibles</button></td>
+        </tr>`).join('');
+
+      document.querySelector('#contenido-app .cargando') &&
+        (document.querySelector('#contenido-app .cargando').remove());
+
+      document.getElementById('contenido-app').querySelector('.app-panel').insertAdjacentHTML('beforeend', `
+        <div class="tbl-wrap" style="margin-top:12px;">
+          <table class="tbl tbl-g">
+            <thead><tr><th>Materia</th><th>Salon actual</th><th>Sesion</th><th>Accion</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>
+        <div id="salones-res"></div>`);
+    } catch(e) {
+      document.getElementById('ae').className = 'alerta err';
+      document.getElementById('ae').innerText = e.message;
+    }
   }
 
-  async function buscarSalones() {
-    const idG = parseInt(document.getElementById('id-grp').value);
+  async function verSalonesDeGrupo(idG, numSesion) {
     const res = document.getElementById('salones-res');
     const ae  = document.getElementById('ae');
     ae.className = 'alerta';
-    if (!idG || idG < 1) {
-      ae.className = 'alerta err'; ae.innerText = 'Ingrese un ID de grupo valido.'; return;
-    }
-    res.innerHTML = `<div class="cargando">Buscando salones...</div>`;
+    res.innerHTML = `<div class="cargando">Buscando salones disponibles...</div>`;
     try {
-      const ss = await apiGet(`/profesor/salones-disponibles/${idG}`);
+      const ss = await apiGet(`/profesor/salones-disponibles/${idG}?num_sesion=${numSesion}`);
       if (!ss.length) { res.innerHTML = `<p style="color:var(--c-txts);margin-top:12px;">Sin salones disponibles en este horario.</p>`; return; }
       const filas = ss.map(s => `
         <tr>
           <td>${s.nombre}</td>
           <td>${s.capacidad} personas</td>
-          <td><button class="btn-ok" onclick="cambiarSalon(${idG},${s.id})">Seleccionar</button></td>
+          <td><button class="btn-ok" onclick="cambiarSalon(${idG},${s.id},${numSesion})">Seleccionar</button></td>
         </tr>`).join('');
       res.innerHTML = `
         <div class="tbl-wrap" style="margin-top:12px;">
@@ -603,54 +647,19 @@ async function renderHorario() {
     }
   }
 
-  async function cambiarSalon(idG, idS) {
+  async function cambiarSalon(idG, idS, numSesion) {
     const ae = document.getElementById('ae');
     const ao = document.getElementById('ao');
     ae.className = ao.className = 'alerta';
     try {
-      const r = await apiPut(`/profesor/cambiar-salon?id_grupo=${idG}&id_nuevo_salon=${idS}`);
+      const r = await apiPut(`/profesor/cambiar-salon?id_grupo=${idG}&id_nuevo_salon=${idS}&num_sesion=${numSesion}`);
       ao.className = 'alerta ok'; ao.innerText = r.mensaje;
       document.getElementById('salones-res').innerHTML = '';
+      renderSalones();
     } catch(e) {
       ae.className = 'alerta err'; ae.innerText = e.message;
     }
   }
-
-  /* ══ CALIFICAR INSCRIPCION (Profesor) ════════════════════════════ */
-  function renderCalificar() {
-    contenido(panel('Calificar Inscripcion',
-      `<div id="ae" class="alerta"></div>
-       <div id="ao" class="alerta"></div>
-       <p style="font-size:12px;color:var(--c-txts);margin-bottom:12px;">
-         Actualiza el estado de una inscripcion. El ID de inscripcion lo puedes consultar en la base de datos.
-         Aprobar una materia activa los prerequisitos para las siguientes de la cadena.
-       </p>
-       <div class="frm-fila">
-         <input type="number" id="id-insc" class="campo" placeholder="ID de la inscripcion" min="1">
-       </div>
-       <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
-         <button class="btn-ok" onclick="calificar(true)" style="flex:1;">Marcar como Aprobado</button>
-         <button class="btn-err" onclick="calificar(false)" style="flex:1;">Marcar como Reprobado</button>
-       </div>`
-    ));
-  }
-
-  async function calificar(aprobada) {
-    const idI = parseInt(document.getElementById('id-insc').value);
-    const ae  = document.getElementById('ae');
-    const ao  = document.getElementById('ao');
-    ae.className = ao.className = 'alerta';
-    if (!idI || idI < 1) {
-      ae.className = 'alerta err'; ae.innerText = 'Ingrese un ID de inscripcion valido.'; return;
-    }
-    try {
-      const r = await apiPut(`/inscripcion/${idI}/estado?aprobada=${aprobada}`);
-      ao.className = 'alerta ok'; ao.innerText = r.mensaje;
-    } catch(e) {
-      ae.className = 'alerta err'; ae.innerText = e.message;
-    }
-  }
-
   /* ══ OPTIMIZAR (Admin) ════════════════════════════════════════════ */
   function renderOptimizar() {
     contenido(panel('Optimizacion Genetica de Horarios',
