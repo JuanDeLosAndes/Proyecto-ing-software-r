@@ -140,16 +140,21 @@ def _buscar_profesor(session: Session, facultad: str):
 @router.get("/materias", status_code=200)
 def ListarMaterias(
     sesion: SesionToken = Depends(ObtenerSesAct),
-    session: Session = Depends(ObtenerSes)
+    session: Session = Depends(ObtenerSes),
+    catalogo: bool = False
 ):
-    """Lista materias. Estudiante: filtra por semestre y prerequisitos."""
+    """
+    Lista materias.
+    - catalogo=true  → devuelve TODAS las 20 materias (vista 'Ver Materias').
+    - catalogo=false → filtra por semestre/prerequisitos del estudiante (para inscribir).
+    """
     materias = session.exec(select(Materia)).all()
 
     est            = None
     aprobadas_ids: set = set()
     inscritas_ids: set = set()
 
-    if sesion.rol == "Estudiante":
+    if sesion.rol == "Estudiante" and not catalogo:
         us = session.exec(
             select(Usuario).where(Usuario.codigo == sesion.codigo_usuario)
         ).first()
@@ -181,7 +186,7 @@ def ListarMaterias(
             pm = session.get(Materia, m.id_prerequisito)
             prereq_nombre = pm.nombre if pm else None
 
-        if est:
+        if est and not catalogo:
             if m.semestre > est.semestre:
                 continue
             if m.id in inscritas_ids:
@@ -189,10 +194,14 @@ def ListarMaterias(
             if m.id_prerequisito and m.id_prerequisito not in aprobadas_ids:
                 continue
 
+        inscrita = m.id in inscritas_ids
+        aprobada = m.id in aprobadas_ids
+
         resultado.append({
             "id": m.id, "nombre": m.nombre,
             "creditos": m.creditos, "facultad": m.facultad,
-            "semestre": m.semestre, "prerequisito": prereq_nombre
+            "semestre": m.semestre, "prerequisito": prereq_nombre,
+            "inscrita": inscrita, "aprobada": aprobada
         })
 
     return sorted(resultado, key=lambda x: (x["semestre"], x["nombre"]))

@@ -2,13 +2,22 @@
 {% block titulo %}Iniciar Sesion{% endblock %}
 
 {% block contenido %}
+
+<!-- SEDE ROTANTE - esquina superior derecha -->
+<div id="sede-badge" style="
+  position:fixed; top:14px; right:18px; z-index:9999;
+  background:var(--c-osc,#0d1b4c); color:#fff;
+  padding:6px 14px; border-radius:20px;
+  font-size:12px; font-weight:600; letter-spacing:.04em;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+  transition:opacity .5s ease;
+"></div>
+
 <div class="login-wrap" role="main">
 
-  <!-- Columna izquierda: formulario (Patron F — maxima fijacion visual) -->
   <section class="login-izq" aria-labelledby="login-titulo">
     <div class="login-box">
 
-      <!-- Sin emoji: circulo CSS institucional -->
       <div class="login-ico" aria-hidden="true"
            style="font-size:15px; font-weight:700; color:var(--c-ama); letter-spacing:.02em;">
         UCC
@@ -20,7 +29,6 @@
       <div id="alerta-err" class="alerta" role="alert" aria-live="assertive"></div>
       <div id="alerta-ok"  class="alerta" role="status" aria-live="polite"></div>
 
-      <!-- Inputs corregidos: fondo blanco, texto oscuro -->
       <div class="campo-grp">
         <label class="label" for="codigo">Codigo Institucional</label>
         <input type="text" id="codigo" class="campo"
@@ -40,10 +48,48 @@
                autocomplete="current-password" aria-required="true">
       </div>
 
-      <!-- Boton CTA amarillo: guia el ojo al punto de accion (Patron F) -->
       <button class="btn-p" id="btn-login" onclick="ejecutarLogin()">
         INGRESAR
       </button>
+
+      <!-- OLVIDÓ CONTRASEÑA -->
+      <div style="text-align:center; margin-top:14px;">
+        <a href="#" id="link-olv" onclick="mostrarCambioContrasena(event)"
+           style="font-size:12px; color:var(--c-med,#1565c0); text-decoration:underline; cursor:pointer;">
+          ¿Olvidó su contraseña? Cambiar contraseña
+        </a>
+      </div>
+
+      <!-- PANEL CAMBIO DE CONTRASEÑA -->
+      <div id="panel-cambio" style="display:none; margin-top:18px; padding:16px;
+           background:#f4f6fb; border-radius:8px; border:1px solid #c7d2e8;">
+        <h3 style="font-size:13px; color:var(--c-osc,#0d1b4c); margin:0 0 12px;">Cambiar Contraseña</h3>
+        <div id="alerta-cambio" class="alerta" role="alert"></div>
+        <div class="campo-grp" style="margin-bottom:10px;">
+          <label class="label" for="codigo-cambio">Codigo Institucional</label>
+          <input type="text" id="codigo-cambio" class="campo" placeholder="Tu codigo" maxlength="10" inputmode="numeric">
+        </div>
+        <div class="campo-grp" style="margin-bottom:10px;">
+          <label class="label" for="nueva-clave">Nueva Contraseña</label>
+          <input type="password" id="nueva-clave" class="campo" placeholder="Minimo 8 caracteres, una mayuscula">
+        </div>
+        <div class="campo-grp" style="margin-bottom:10px;">
+          <label class="label" for="confirmar-clave">Confirmar Contraseña</label>
+          <input type="password" id="confirmar-clave" class="campo" placeholder="Repite la nueva contraseña">
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn-p" onclick="ejecutarCambioContrasena()"
+                  style="flex:1; min-width:120px; font-size:12px; padding:10px;">
+            Guardar Contraseña
+          </button>
+          <button onclick="ocultarCambioContrasena()"
+                  style="flex:1; min-width:100px; font-size:12px; padding:10px;
+                         background:transparent; border:1px solid var(--c-osc,#0d1b4c);
+                         color:var(--c-osc,#0d1b4c); border-radius:6px; cursor:pointer;">
+            Cancelar
+          </button>
+        </div>
+      </div>
 
       <div class="login-sep"></div>
       <p class="login-footer-txt">
@@ -54,19 +100,9 @@
     </div>
   </section>
 
-  <!-- Columna derecha: carrusel UCC + info institucional -->
-  <!-- En movil: aparece ARRIBA (identificacion visual UCC) -->
   <aside class="login-der" aria-label="Informacion institucional">
-
     <div class="car-wrap" id="car-wrap">
-      <!-- Patron geometrico como fondo cuando no hay imagenes configuradas -->
       <div class="car-pattern" aria-hidden="true"></div>
-      <!--
-        CORRECCION CARRUSEL:
-        - Sin src="" (causaba peticion al servidor actual)
-        - Sin clase activa inicial (se agrega por JS tras cargar la imagen)
-        - onerror: oculta la imagen si la URL falla
-      -->
       <img id="ci0" class="car-img"
            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
            alt="Campus Universidad Catolica de Colombia"
@@ -95,7 +131,6 @@
         <p id="msg-4">Conectando a base de datos segura.</p>
       </div>
     </div>
-
   </aside>
 
   <div class="info-movil">
@@ -108,33 +143,64 @@
 {% block scripts %}
 <script>
   const API = window.location.origin;
-  const imgIds  = ['ci0', 'ci1', 'ci2'];
-  let   imgUrls = [];
-  let   carIdx  = 0;
-  let   carTimer = null;
+  const imgIds = ['ci0', 'ci1', 'ci2'];
+  const IMG_LOCALES = [
+    `${API}/static/img/uni1.jpg`,
+    `${API}/static/img/uni2.jpg`,
+    `${API}/static/img/uni3.jpg`
+  ];
+  let imgUrls  = [];
+  let carIdx   = 0;
+  let carTimer = null;
 
-  /* ── Carrusel (SRP: solo maneja rotacion de imagenes) ── */
+  /* ── SEDE ROTANTE ── */
+  const SEDES = [
+    'Sede Principal — Bogotá',
+    'Sede Las Torres — Bogotá',
+    'Sede Claustro — Bogotá',
+    'Sede El Lago — Bogotá',
+  ];
+  let sedeIdx = 0;
+  function rotarSede() {
+    const badge = document.getElementById('sede-badge');
+    if (!badge) return;
+    badge.style.opacity = '0';
+    setTimeout(() => {
+      badge.innerText = SEDES[sedeIdx % SEDES.length];
+      badge.style.opacity = '1';
+      sedeIdx++;
+    }, 400);
+  }
+  rotarSede();
+  setInterval(rotarSede, 4000);
+
+  /* ── Carrusel ── */
   function iniciarCarrusel(urls) {
-    imgUrls = urls.filter(u => u && u.trim() !== '');
-    if (!imgUrls.length) return;
+    const validas = (urls || []).filter(u => u && u.trim() !== '');
+    imgUrls = validas.length ? validas : IMG_LOCALES;
 
-    // Asignar URLs a los img elements
     imgUrls.forEach((url, i) => {
       const el = document.getElementById(imgIds[i]);
       if (el) {
         el.src = url;
-        // onload: mostrar imagen solo cuando cargo correctamente
-        el.onload = function() {
-          if (i === 0) activarImg(0);
+        el.onload = function() { if (i === 0) activarImg(0); };
+        el.onerror = function() {
+          if (validas.length && IMG_LOCALES[i]) {
+            el.src = IMG_LOCALES[i];
+            el.onerror = function() {
+              el.classList.remove('activa');
+              el.style.opacity = '0';
+            };
+          } else {
+            el.classList.remove('activa');
+            el.style.opacity = '0';
+          }
         };
       }
     });
 
     renderDots();
-
-    // Si la primera imagen tarda, mostrarla igual despues de 500ms
     setTimeout(() => { if (carIdx === 0) activarImg(0); }, 600);
-
     carTimer = setInterval(() => {
       carIdx = (carIdx + 1) % Math.min(imgUrls.length, imgIds.length);
       activarImg(carIdx);
@@ -168,12 +234,12 @@
     }, 4500);
   };
 
-  /* ── Cargar config institucional ── */
+  /* ── Cargar config ── */
   document.addEventListener('DOMContentLoaded', () => {
     fetch(`${API}/front/config`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (!d) return;
+        if (!d) { iniciarCarrusel([]); return; }
         setText('msg-1',    d.mensaje_1);
         setText('msg-2',    d.mensaje_2);
         setText('msg-3',    d.mensaje_3);
@@ -181,7 +247,7 @@
         setText('msg-movil', d.mensaje_1 || 'Universidad Catolica de Colombia');
         iniciarCarrusel([d.url_img_1, d.url_img_2, d.url_img_3]);
       })
-      .catch(() => {});
+      .catch(() => { iniciarCarrusel([]); });
   });
 
   function setText(id, val) {
@@ -189,29 +255,82 @@
     if (el && val && val.trim()) el.innerText = val;
   }
 
-  /* ── Validacion cliente ── */
+  /* ── CAMBIO DE CONTRASEÑA ── */
+  function mostrarCambioContrasena(e) {
+    e.preventDefault();
+    document.getElementById('panel-cambio').style.display = 'block';
+    document.getElementById('link-olv').style.display = 'none';
+    document.getElementById('codigo-cambio').focus();
+  }
+
+  function ocultarCambioContrasena() {
+    document.getElementById('panel-cambio').style.display = 'none';
+    document.getElementById('link-olv').style.display = 'inline';
+    document.getElementById('alerta-cambio').className = 'alerta';
+    ['codigo-cambio','nueva-clave','confirmar-clave'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.value = ''; el.classList.remove('campo-err'); }
+    });
+  }
+
+  async function ejecutarCambioContrasena() {
+    const ac     = document.getElementById('alerta-cambio');
+    const codigo = document.getElementById('codigo-cambio').value.trim();
+    const nueva  = document.getElementById('nueva-clave').value.trim();
+    const conf   = document.getElementById('confirmar-clave').value.trim();
+    ac.className = 'alerta';
+
+    if (!codigo) { ac.className='alerta err'; ac.innerText='Ingrese su codigo institucional.'; return; }
+    if (!/^\d+$/.test(codigo) || codigo.length < 8) {
+      ac.className='alerta err'; ac.innerText='Codigo invalido (minimo 8 digitos numericos).'; return;
+    }
+    if (nueva.length < 8) {
+      ac.className='alerta err'; ac.innerText='La nueva contraseña debe tener minimo 8 caracteres.'; return;
+    }
+    if (!/[A-Z]/.test(nueva)) {
+      ac.className='alerta err'; ac.innerText='La contraseña debe contener al menos una letra mayuscula.'; return;
+    }
+    if (!/[a-z]/.test(nueva)) {
+      ac.className='alerta err'; ac.innerText='La contraseña debe contener al menos una letra minuscula.'; return;
+    }
+    if (nueva !== conf) {
+      ac.className='alerta err'; ac.innerText='Las contraseñas no coinciden.'; return;
+    }
+
+    try {
+      const r = await fetch(`${API}/usuarios/cambiar-contrasena`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo, nueva_contrasena: nueva })
+      });
+      const data = await r.json();
+      if (!r.ok) { ac.className='alerta err'; ac.innerText = data.detail || 'Error al cambiar contraseña.'; return; }
+      ac.className='alerta ok'; ac.innerText = '¡Contraseña cambiada! Ya puede iniciar sesion.';
+      setTimeout(ocultarCambioContrasena, 2500);
+    } catch {
+      ac.className='alerta err'; ac.innerText='No se pudo conectar con el servidor.';
+    }
+  }
+
+  /* ── Validacion y login ── */
   function validarCampos(codigo, clave) {
-    if (!codigo.trim())             return ['codigo',    'El codigo institucional es obligatorio.'];
-    if (!/^\d+$/.test(codigo.trim())) return ['codigo',  'El codigo solo puede contener numeros, no letras ni simbolos.'];
-    if (codigo.trim().length < 8)   return ['codigo',    'El codigo debe tener al menos 8 digitos.'];
-    if (!clave.trim())              return ['contrasena', 'La contrasena es obligatoria.'];
+    if (!codigo.trim())               return ['codigo',    'El codigo institucional es obligatorio.'];
+    if (!/^\d+$/.test(codigo.trim())) return ['codigo',    'El codigo solo puede contener numeros.'];
+    if (codigo.trim().length < 8)     return ['codigo',    'El codigo debe tener al menos 8 digitos.'];
+    if (!clave.trim())                return ['contrasena','La contrasena es obligatoria.'];
     return null;
   }
 
   function mostrarErr(msg) {
     const e = document.getElementById('alerta-err');
-    e.className = 'alerta err';
-    e.innerText = msg;
+    e.className = 'alerta err'; e.innerText = msg;
     document.getElementById('alerta-ok').className = 'alerta';
   }
-
   function mostrarOk(msg) {
     const e = document.getElementById('alerta-ok');
-    e.className = 'alerta ok';
-    e.innerText = msg;
+    e.className = 'alerta ok'; e.innerText = msg;
     document.getElementById('alerta-err').className = 'alerta';
   }
-
   function limpiarAlertas() {
     document.getElementById('alerta-err').className = 'alerta';
     document.getElementById('alerta-ok').className  = 'alerta';
@@ -221,30 +340,23 @@
   ['codigo','contrasena'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', limpiarAlertas);
   });
-
   document.addEventListener('keydown', e => { if (e.key === 'Enter') ejecutarLogin(); });
 
   async function ejecutarLogin() {
     const codigo = document.getElementById('codigo').value;
     const clave  = document.getElementById('contrasena').value;
     limpiarAlertas();
-
     const error = validarCampos(codigo, clave);
     if (error) {
       document.getElementById(error[0]).classList.add('campo-err');
-      mostrarErr(error[1]);
-      return;
+      mostrarErr(error[1]); return;
     }
-
     const btn = document.getElementById('btn-login');
-    btn.disabled  = true;
-    btn.innerText = 'Verificando...';
-
+    btn.disabled = true; btn.innerText = 'Verificando...';
     try {
       const res  = await fetch(`${API}/login`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ codigo: codigo.trim(), contrasena: clave.trim() })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo: codigo.trim(), contrasena: clave.trim() })
       });
       const data = await res.json();
       if (!res.ok) { mostrarErr(data.detail || 'Credenciales incorrectas.'); return; }
@@ -253,8 +365,7 @@
     } catch {
       mostrarErr('No se pudo conectar con el servidor. Intente de nuevo.');
     } finally {
-      btn.disabled  = false;
-      btn.innerText = 'INGRESAR';
+      btn.disabled = false; btn.innerText = 'INGRESAR';
     }
   }
 </script>

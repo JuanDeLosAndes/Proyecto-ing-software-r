@@ -1,15 +1,14 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
 from database import ObtenerSes
-from modelos.entidades import Usuario, Rol
-from modelos.esquemas import EsquemaLogin, EsquemaRegistro
+from modelos.entidades import Usuario, Rol, Estudiante, Profesor, Administrador, SesionToken
+from modelos.esquemas import EsquemaLogin, EsquemaRegistro, EsquemaCambioContrasena
 from servicios.fabricas import CreadorUs
-from servicios.sesiones import GestorSesion
+from servicios.sesiones import GestorSesion, ObtenerSesAct
 
 router = APIRouter()
 
 ESPECIALIDADES_VALIDAS = {"Ingeniería de Sistemas", "Ciencias Básicas"}
-
 ESPECIALIDAD_A_FACULTAD = {
     "Ingeniería de Sistemas": "Sistemas",
     "Ciencias Básicas":       "Ciencias Básicas",
@@ -41,6 +40,24 @@ def CerrarSes(token: str, session: Session = Depends(ObtenerSes)):
     return {"mensaje": "Sesion cerrada correctamente."}
 
 
+@router.post("/usuarios/cambiar-contrasena", status_code=200)
+def CambiarContrasena(data: EsquemaCambioContrasena, session: Session = Depends(ObtenerSes)):
+    """
+    Permite cambiar la contraseña sin sesion activa.
+    Solo requiere el codigo institucional y la nueva contraseña.
+    """
+    us = session.exec(select(Usuario).where(Usuario.codigo == data.codigo)).first()
+    if not us:
+        raise HTTPException(
+            status_code=404,
+            detail="No existe un usuario con ese codigo institucional."
+        )
+    us.contrasena = data.nueva_contrasena
+    session.add(us)
+    session.commit()
+    return {"mensaje": "Contraseña actualizada correctamente. Ya puede iniciar sesion."}
+
+
 @router.post("/usuarios/registrar", status_code=201)
 def RegistrarUs(data: EsquemaRegistro, session: Session = Depends(ObtenerSes)):
     if data.rol_nombre == "Estudiante":
@@ -54,14 +71,12 @@ def RegistrarUs(data: EsquemaRegistro, session: Session = Depends(ObtenerSes)):
                 status_code=400,
                 detail="El semestre es obligatorio para registrar un Estudiante (1 a 10)."
             )
-
     elif data.rol_nombre == "Administrador":
         if len(data.codigo) != 8 or not data.codigo.startswith("9900"):
             raise HTTPException(
                 status_code=400,
                 detail="Codigo de Administrador invalido: debe tener 8 digitos y comenzar con 9900."
             )
-
     elif data.rol_nombre == "Profesor":
         if len(data.codigo) != 10 or data.codigo.startswith("6700") or data.codigo.startswith("9900"):
             raise HTTPException(
@@ -91,13 +106,12 @@ def RegistrarUs(data: EsquemaRegistro, session: Session = Depends(ObtenerSes)):
     try:
         creds = {"codigo": data.codigo, "contrasena": data.contrasena}
         perfilDatos = {
-            "nombre":      data.nombre,
+            "nombre":       data.nombre,
             "especialidad": data.especialidad.strip() if data.especialidad else None,
-            "semestre":    data.semestre or 1
+            "semestre":     data.semestre or 1
         }
         nuevoUs = CreadorUs.RegistrarUs(session, data.rol_nombre, creds, perfilDatos)
 
-        # registrar un profesor, asignar automaticamente
         if data.rol_nombre == "Profesor":
             facultad = ESPECIALIDAD_A_FACULTAD.get(data.especialidad.strip())
             if facultad:
@@ -108,3 +122,15 @@ def RegistrarUs(data: EsquemaRegistro, session: Session = Depends(ObtenerSes)):
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/admin/usuarios/agregar", status_code=201)
+def AgregarUsuarioAdmin(
+    data: EsquemaRegistro,
+    sesion: SesionToken = Depends(ObtenerSesAct),
+    session: Session = Depends(ObtenerSes)
+):
+    """Endpoint exclusivo para administradores: agrega usuarios desde el panel web."""
+    if sesion.rol != "Administrador":
+        raise HTTPException(status_code=403, detail="Solo los administradores pueden agregar usuarios.")
+    return RegistrarUs(data, session)

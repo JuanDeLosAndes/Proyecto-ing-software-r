@@ -27,10 +27,41 @@ class EsquemaLogin(BaseModel):
         return v
 
 
+class EsquemaCambioContrasena(BaseModel):
+    """Esquema para cambio de contraseña sin sesion activa."""
+    codigo: str = Field(..., description="Codigo institucional del usuario", example="67001234")
+    nueva_contrasena: str = Field(..., description="Nueva contraseña (min 8 chars, 1 mayuscula, 1 minuscula)", example="NuevaClave1")
+
+    @field_validator("codigo")
+    @classmethod
+    def val_codigo(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("El codigo es obligatorio.")
+        if not v.isdigit():
+            raise ValueError("El codigo solo puede contener numeros.")
+        if len(v) < 8:
+            raise ValueError("El codigo debe tener al menos 8 digitos.")
+        return v
+
+    @field_validator("nueva_contrasena")
+    @classmethod
+    def val_nueva_contrasena(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("La nueva contraseña es obligatoria.")
+        if len(v) < 8:
+            raise ValueError("La contraseña debe tener minimo 8 caracteres.")
+        if not any(c.isupper() for c in v):
+            raise ValueError("La contraseña debe contener al menos una letra mayuscula.")
+        if not any(c.islower() for c in v):
+            raise ValueError("La contraseña debe contener al menos una letra minuscula.")
+        return v
+
+
 class EsquemaRegistro(BaseModel):
     rol_nombre: Literal["Estudiante", "Profesor", "Administrador"] = Field(
-        ...,
-        description="Rol del usuario en el sistema"
+        ..., description="Rol del usuario en el sistema"
     )
     codigo: str = Field(
         ...,
@@ -42,19 +73,14 @@ class EsquemaRegistro(BaseModel):
         description="Minimo 8 caracteres, al menos una mayuscula y una minuscula.",
         example="MiClave12"
     )
-    nombre: str = Field(
-        ...,
-        description="Nombre completo del usuario",
-        example="Juan Perez"
-    )
+    nombre: str = Field(..., description="Nombre completo del usuario", example="Juan Perez")
     especialidad: Optional[str] = Field(
         None,
         description="Solo Profesores: 'Ingenieria de Sistemas' o 'Ciencias Basicas'",
         example="Ingenieria de Sistemas"
     )
     semestre: Optional[int] = Field(
-        None,
-        ge=1, le=10,
+        None, ge=1, le=10,
         description="Solo Estudiantes: semestre academico actual (1 a 10)",
         example=1
     )
