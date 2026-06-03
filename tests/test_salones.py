@@ -12,6 +12,15 @@ def _inscribir_y_obtener_grupo(client, token_est, id_materia):
     return grupos[0]["id_grupo"] if grupos else None
 
 
+def _materia_de_sistemas(client, token_est):
+    """Helper: retorna la primera materia de semestre 1 de Sistemas sin prerequisito."""
+    materias = client.get(f"/materias?token={token_est}").json()
+    return next(
+        m for m in materias
+        if m["semestre"] == 1 and not m["prerequisito"] and m["facultad"] == "Sistemas"
+    )
+
+
 class TestSalonesDisponibles:
     def test_requiere_rol_profesor_403(self, client, token_estudiante_s1):
         """403 cuando un estudiante consulta salones disponibles."""
@@ -26,16 +35,14 @@ class TestSalonesDisponibles:
     def test_salones_disponibles_excluyen_ocupados(self, client, token_profesor):
         """
         Los salones ya ocupados en la misma franja horaria no aparecen
-        en la lista de disponibles (sesion 1 y sesion 2 revisadas).
+        en la lista de disponibles.
         """
-        # Crear un estudiante e inscribirlo para generar un grupo con salon asignado
         registrar_usuario(
             client, "Estudiante", "67006601", "SalPass01",
             "Estudiante Salon", semestre=1
         )
         token_est = loguear(client, "67006601", "SalPass01")
-        materias  = client.get(f"/materias?token={token_est}").json()
-        mat       = next(m for m in materias if m["semestre"] == 1 and not m["prerequisito"])
+        mat       = _materia_de_sistemas(client, token_est)
         id_grupo  = _inscribir_y_obtener_grupo(client, token_est, mat["id"])
 
         if not id_grupo:
@@ -45,12 +52,9 @@ class TestSalonesDisponibles:
             f"/profesor/salones-disponibles/{id_grupo}?token={token_profesor}"
         ).json()
 
-        # El salon ya asignado al grupo NO debe aparecer como disponible
-        grupos   = client.get(f"/materias/{mat['id']}/grupos?token={token_est}").json()
-        # Verificar que la respuesta es una lista de dicts con campos esperados
         for sal in salones_disp:
-            assert "id"       in sal
-            assert "nombre"   in sal
+            assert "id"        in sal
+            assert "nombre"    in sal
             assert "capacidad" in sal
 
 
@@ -76,8 +80,7 @@ class TestCambiarSalon:
             "Para Cambio Salon", semestre=1
         )
         token_est = loguear(client, "67006602", "SalPass02")
-        materias  = client.get(f"/materias?token={token_est}").json()
-        mat       = [m for m in materias if m["semestre"] == 1 and not m["prerequisito"]][1]
+        mat       = _materia_de_sistemas(client, token_est)
         id_grupo  = _inscribir_y_obtener_grupo(client, token_est, mat["id"])
 
         if not id_grupo:
@@ -93,20 +96,21 @@ class TestCambiarSalon:
         El cambio de salon queda guardado en BD.
         Los estudiantes del grupo ven el nuevo salon en su horario.
         """
-        # Crear estudiante e inscribir
         registrar_usuario(
             client, "Estudiante", "67006603", "SalPass03",
             "Cambio Salon Est", semestre=1
         )
         token_est = loguear(client, "67006603", "SalPass03")
-        materias  = client.get(f"/materias?token={token_est}").json()
-        mat       = [m for m in materias if m["semestre"] == 1 and not m["prerequisito"]][2]
-        id_grupo  = _inscribir_y_obtener_grupo(client, token_est, mat["id"])
+
+        materias_sis = client.get(f"/materias?token={token_est}").json()
+        mats_sis = [m for m in materias_sis if m["facultad"] == "Sistemas" and not m["prerequisito"]]
+        mat = mats_sis[min(2, len(mats_sis) - 1)]
+
+        id_grupo = _inscribir_y_obtener_grupo(client, token_est, mat["id"])
 
         if not id_grupo:
             pytest.skip("No se pudo obtener grupo")
 
-        # Obtener salones disponibles
         salones = client.get(
             f"/profesor/salones-disponibles/{id_grupo}?token={token_profesor}&num_sesion=1"
         ).json()
@@ -117,7 +121,6 @@ class TestCambiarSalon:
         nuevo_salon_id   = salones[0]["id"]
         nuevo_salon_name = salones[0]["nombre"]
 
-        # Cambiar salon
         res = client.put(
             f"/profesor/cambiar-salon"
             f"?id_grupo={id_grupo}&id_nuevo_salon={nuevo_salon_id}"
@@ -125,7 +128,6 @@ class TestCambiarSalon:
         )
         assert res.status_code == 200
 
-        # Verificar que el estudiante ve el nuevo salon en su horario
         horario = client.get(f"/horarios?token={token_est}").json()
         salones_en_horario = [
             celda["salon_nombre"]

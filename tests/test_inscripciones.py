@@ -17,14 +17,14 @@ def _crear_estudiante_fresco(client, codigo, semestre):
 class TestListarMaterias:
     def test_lista_20_materias(self, client, token_estudiante_s1):
         """200 y exactamente 20 materias en el catalogo."""
-        res = client.get(f"/materias?token={token_estudiante_s1}")
+        res = client.get(f"/materias?token={token_estudiante_s1}&catalogo=true")
         assert res.status_code == 200
         data = res.json()
         assert len(data) == 20
 
     def test_materias_tienen_semestre(self, client, token_estudiante_s1):
         """Todas las materias tienen campo semestre entre 1 y 3."""
-        res = client.get(f"/materias?token={token_estudiante_s1}")
+        res = client.get(f"/materias?token={token_estudiante_s1}&catalogo=true")
         for mat in res.json():
             assert 1 <= mat["semestre"] <= 3
 
@@ -39,7 +39,6 @@ class TestInscripcion:
         """201 al inscribir una materia de semestre 1 siendo estudiante de semestre 1."""
         token_est = _crear_estudiante_fresco(client, "67007701", 1)
 
-        # Obtener id de una materia de semestre 1 sin prerequisito
         materias = client.get(f"/materias?token={token_est}").json()
         mat_s1   = next(m for m in materias if m["semestre"] == 1 and not m["prerequisito"])
 
@@ -56,10 +55,8 @@ class TestInscripcion:
         materias  = client.get(f"/materias?token={token_est}").json()
         mat_s1    = next(m for m in materias if m["semestre"] == 1 and not m["prerequisito"])
 
-        # Inscribir
         client.post(f"/inscribir?token={token_est}", json={"id_materia": mat_s1["id"]})
 
-        # Verificar que el grupo tiene sesiones asignadas
         grupos = client.get(
             f"/materias/{mat_s1['id']}/grupos?token={token_est}"
         ).json()
@@ -72,13 +69,11 @@ class TestInscripcion:
         """El horario del estudiante muestra la materia 2 veces en la semana."""
         token_est = _crear_estudiante_fresco(client, "67007703", 1)
         materias  = client.get(f"/materias?token={token_est}").json()
-        # Usar materia diferente a la de los tests anteriores
         mat_s1    = [m for m in materias if m["semestre"] == 1 and not m["prerequisito"]][1]
 
         client.post(f"/inscribir?token={token_est}", json={"id_materia": mat_s1["id"]})
 
         horario = client.get(f"/horarios?token={token_est}").json()
-        # Contar apariciones de la materia
         apariciones = sum(
             1 for franja in horario.values()
             for celda in franja.values()
@@ -89,7 +84,7 @@ class TestInscripcion:
     def test_inscripcion_semestre_insuficiente_400(self, client):
         """400 al intentar inscribir materia de semestre 2 siendo de semestre 1."""
         token_est = _crear_estudiante_fresco(client, "67007704", 1)
-        materias  = client.get(f"/materias?token={token_est}").json()
+        materias  = client.get(f"/materias?token={token_est}&catalogo=true").json()
         mat_s2    = next(m for m in materias if m["semestre"] == 2)
 
         res = client.post(
@@ -122,7 +117,7 @@ class TestInscripcion:
     def test_prerequisito_no_cumplido_400(self, client):
         """400 al intentar inscribir Calculo Integral sin aprobar Calculo Diferencial."""
         token_est = _crear_estudiante_fresco(client, "67007706", 2)
-        materias  = client.get(f"/materias?token={token_est}").json()
+        materias  = client.get(f"/materias?token={token_est}&catalogo=true").json()
         mat_ci    = next(m for m in materias if m["nombre"] == "Calculo Integral")
 
         res = client.post(
