@@ -5,13 +5,15 @@ from modelos.entidades import (
     Grupo, Materia, Salon, Inscripcion,
     Usuario, Profesor, SesionToken
 )
-from servicios.eventos import GestorEv, ObservadorCon
+
+from servicios.eventos import obtener_gestor
 from servicios.sesiones import ObtenerSesAct
 
 router = APIRouter()
 
 
 def _ocupados_en(session: Session, dia: str, hora: str, excluir_id: int) -> set:
+    """SRP: devuelve IDs de salones ocupados en una franja dada."""
     s1 = session.exec(
         select(Grupo.id_salon).where(
             Grupo.dia  == dia, Grupo.hora  == hora,
@@ -29,27 +31,67 @@ def _ocupados_en(session: Session, dia: str, hora: str, excluir_id: int) -> set:
 
 def _salon_valido_para_facultad(salon: Salon, facultad: str) -> bool:
     """
-    Ciencias Basicas solo aulas (nunca Salas de Computo).
-    Sistemas  prefiere salas, puede usar aulas.
+    OCP: regla de compatibilidad en un solo lugar.
+    Ciencias Basicas nunca usa Salas de Computo.
     """
     if facultad == "Ciencias Básicas" and "Sala" in salon.nombre:
         return False
     return True
 
 
-@router.get("/profesor/salones-disponibles/{id_grupo}", status_code=200)
-def ObtenerSal(
+def _obtener_profesor_de_sesion(sesion: SesionToken, session: Session) -> Profesor:
+    """SRP: resuelve el Profesor a partir del token de sesion."""
+    us = session.exec(
+        select(Usuario).where(Usuario.codigo == sesion.codigo_usuario)
+    ).first()
+    if not us:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    prof = session.exec(
+        select(Profesor).where(Profesor.id_usuario == us.id)
+    ).first()
+    if not prof:
+        raise HTTPException(status_code=404, detail="Perfil de profesor no encontrado.")
+    return prof
+
+
+
+@router.get("/mis-grupos", status_code=200)
+def MisGrupos(
+    sesion: SesionToken = Depends(ObtenerSesAct),
+    session: Session = Depends(ObtenerSes)
+):
+    """Devuelve los grupos asignados al profesor autenticado."""
+    if sesion.rol != "Profesor":
+        raise HTTPException(status_code=403, detail="Solo los profesores pueden acceder.")
+    prof = _obtener_profesor_de_sesion(sesion, session)
+    grupos = session.exec(select(Grupo).where(Grupo.id_profesor == prof.id)).all()
+    resultado = []
+    for g in grupos:
+        mat = session.get(Materia, g.id_materia)
+        resultado.append({
+            "id_grupo":  g.id,
+            "num_grupo": g.num_grupo,
+            "materia":   mat.nombre if mat else "—",
+            "dia":       g.dia  or "—",
+            "hora":      g.hora or "—",
+        })
+    return resultado
+
+
+
+@router.get("/salones-libres", status_code=200)
+def SalonesLibres(
     id_grupo: int,
     num_sesion: int = 1,
     sesion: SesionToken = Depends(ObtenerSesAct),
     session: Session = Depends(ObtenerSes)
 ):
     """
-    Filtra ocupados y filtra incompatibles con la facultad:
-    Ciencias Basicas nunca ve Salas de Computo.
+    Alias simplificado para el frontend.
+    Filtra salones incompatibles con la facultad.
     """
     if sesion.rol != "Profesor":
-        raise HTTPException(status_code=403, detail="Solo los profesores pueden acceder a esta operacion.")
+        raise HTTPException(status_code=403, detail="Solo los profesores pueden acceder.")
 
     grupo = session.get(Grupo, id_grupo)
     if not grupo:
@@ -60,7 +102,10 @@ def ObtenerSal(
     hora     = grupo.hora if num_sesion == 1 else grupo.hora2
 
     if not dia or not hora:
-        raise HTTPException(status_code=400, detail=f"El grupo no tiene sesion {num_sesion} configurada.")
+        raise HTTPException(
+            status_code=400,
+            detail=f"El grupo no tiene sesion {num_sesion} configurada."
+        )
 
     ocupados = _ocupados_en(session, dia, hora, grupo.id)
     facultad = materia.facultad if materia else None
@@ -76,8 +121,9 @@ def ObtenerSal(
     ]
 
 
-@router.put("/profesor/cambiar-salon", status_code=200)
-def CambiarSal(
+
+@router.put("/grupos/{id_grupo}/salon/{id_nuevo_salon}", status_code=200)
+def CambiarSalPorRuta(
     id_grupo: int,
     id_nuevo_salon: int,
     num_sesion: int = 1,
@@ -85,18 +131,16 @@ def CambiarSal(
     session: Session = Depends(ObtenerSes)
 ):
     """
-    si prof cambia salon
-    Valida compatibilidad de facultad, aforo y disponibilidad.
+    Endpoint con ruta limpia para el frontend.
+    DIP: notifica via gestor global, sin instanciar concretos aqui.
     """
     if sesion.rol != "Profesor":
         raise HTTPException(status_code=403, detail="Solo los profesores pueden cambiar salones.")
 
-    us    = session.exec(select(Usuario).where(Usuario.codigo == sesion.codigo_usuario)).first()
-    prof  = session.exec(select(Profesor).where(Profesor.id_usuario == us.id)).first()
+    prof  = _obtener_profesor_de_sesion(sesion, session)
     grupo = session.get(Grupo, id_grupo)
     if not grupo:
         raise HTTPException(status_code=404, detail="Grupo no encontrado.")
-
     if grupo.id_profesor != prof.id:
         raise HTTPException(status_code=403, detail="Solo puedes cambiar salones de tus propios grupos.")
 
@@ -138,11 +182,10 @@ def CambiarSal(
     session.add(grupo)
     session.commit()
 
-    gestor = GestorEv()
-    gestor.suscribir(ObservadorCon())
-    gestor.NotificarTod("CAMBIO_SALON", {
-        "grupo_id": id_grupo, "nuevo_salon_id": id_nuevo_salon,
-        "num_sesion": num_sesion
+    obtener_gestor().NotificarTod("CAMBIO_SALON", {
+        "grupo_id":       id_grupo,
+        "nuevo_salon_id": id_nuevo_salon,
+        "num_sesion":     num_sesion,
     })
 
     return {
@@ -151,3 +194,31 @@ def CambiarSal(
             "Los estudiantes del grupo veran el cambio de inmediato."
         )
     }
+
+
+
+@router.get("/profesor/salones-disponibles/{id_grupo}", status_code=200)
+def ObtenerSal(
+    id_grupo: int,
+    num_sesion: int = 1,
+    sesion: SesionToken = Depends(ObtenerSesAct),
+    session: Session = Depends(ObtenerSes)
+):
+    """Endpoint original — redirige a SalonesLibres para no duplicar logica."""
+    return SalonesLibres(id_grupo=id_grupo, num_sesion=num_sesion,
+                         sesion=sesion, session=session)
+
+
+@router.put("/profesor/cambiar-salon", status_code=200)
+def CambiarSal(
+    id_grupo: int,
+    id_nuevo_salon: int,
+    num_sesion: int = 1,
+    sesion: SesionToken = Depends(ObtenerSesAct),
+    session: Session = Depends(ObtenerSes)
+):
+    """Endpoint original — delega en CambiarSalPorRuta para no duplicar logica."""
+    return CambiarSalPorRuta(
+        id_grupo=id_grupo, id_nuevo_salon=id_nuevo_salon,
+        num_sesion=num_sesion, sesion=sesion, session=session
+    )

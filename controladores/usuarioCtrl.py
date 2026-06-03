@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
 from database import ObtenerSes
-from modelos.entidades import Usuario, Rol, Estudiante, Profesor, Administrador, SesionToken
+from modelos.entidades import (
+    Usuario, Rol, Estudiante, Profesor, Administrador, SesionToken
+)
 from modelos.esquemas import EsquemaLogin, EsquemaRegistro, EsquemaCambioContrasena
 from servicios.fabricas import CreadorUs
 from servicios.sesiones import GestorSesion, ObtenerSesAct
@@ -13,6 +15,37 @@ ESPECIALIDAD_A_FACULTAD = {
     "Ingeniería de Sistemas": "Sistemas",
     "Ciencias Básicas":       "Ciencias Básicas",
 }
+
+
+def _asignar_profe_pendiente(session: Session, facultad: str) -> None:
+    """
+    SRP: asigna profesor a grupos huerfanos de esa facultad.
+    Movido aqui para eliminar el import circular con inscripcionCtrl.
+    DIP: recibe session inyectada.
+    """
+    from modelos.entidades import Grupo, Materia
+    especialidad_map = {
+        "Sistemas":         "Ingeniería de Sistemas",
+        "Ciencias Básicas": "Ciencias Básicas",
+    }
+    especialidad = especialidad_map.get(facultad)
+    if not especialidad:
+        return
+    prof = session.exec(
+        select(Profesor).where(Profesor.especialidad == especialidad)
+    ).first()
+    if not prof:
+        return
+    grupos_sin_prof = session.exec(
+        select(Grupo)
+        .join(Materia, Grupo.id_materia == Materia.id)
+        .where(Grupo.id_profesor == None, Materia.facultad == facultad)
+    ).all()
+    for g in grupos_sin_prof:
+        g.id_profesor = prof.id
+        session.add(g)
+    if grupos_sin_prof:
+        session.commit()
 
 
 @router.post("/login", status_code=200)
@@ -41,11 +74,10 @@ def CerrarSes(token: str, session: Session = Depends(ObtenerSes)):
 
 
 @router.post("/usuarios/cambiar-contrasena", status_code=200)
-def CambiarContrasena(data: EsquemaCambioContrasena, session: Session = Depends(ObtenerSes)):
-    """
-    Permite cambiar la contraseña sin sesion activa.
-    Solo requiere el codigo institucional y la nueva contraseña.
-    """
+def CambiarContrasena(
+    data: EsquemaCambioContrasena,
+    session: Session = Depends(ObtenerSes)
+):
     us = session.exec(select(Usuario).where(Usuario.codigo == data.codigo)).first()
     if not us:
         raise HTTPException(
@@ -108,14 +140,17 @@ def RegistrarUs(data: EsquemaRegistro, session: Session = Depends(ObtenerSes)):
         perfilDatos = {
             "nombre":       data.nombre,
             "especialidad": data.especialidad.strip() if data.especialidad else None,
-            "semestre":     data.semestre or 1
+            "semestre":     data.semestre or 1,
         }
         nuevoUs = CreadorUs.RegistrarUs(session, data.rol_nombre, creds, perfilDatos)
 
+        # SRP corregido: _asignar_profe_pendiente vive aqui, no en inscripcionCtrl
+        # Elimina el import circular que existia antes
         if data.rol_nombre == "Profesor":
-            facultad = ESPECIALIDAD_A_FACULTAD.get(data.especialidad.strip())
+            facultad = ESPECIALIDAD_A_FACULTAD.get(
+                data.especialidad.strip() if data.especialidad else ""
+            )
             if facultad:
-                from controladores.inscripcionCtrl import _asignar_profe_pendiente
                 _asignar_profe_pendiente(session, facultad)
 
         return {"mensaje": f"Usuario [{data.rol_nombre}] registrado exitosamente.", "id": nuevoUs.id}
@@ -130,7 +165,7 @@ def AgregarUsuarioAdmin(
     sesion: SesionToken = Depends(ObtenerSesAct),
     session: Session = Depends(ObtenerSes)
 ):
-    """Endpoint exclusivo para administradores: agrega usuarios desde el panel web."""
+    """Endpoint exclusivo para administradores."""
     if sesion.rol != "Administrador":
         raise HTTPException(status_code=403, detail="Solo los administradores pueden agregar usuarios.")
     return RegistrarUs(data, session)
