@@ -284,6 +284,35 @@ def InscribirEst(
     ).first():
         raise HTTPException(status_code=409, detail="Ya estas matriculado en esta materia.")
 
+    # ── Validacion de conflicto horario ──────────────────────────────
+    grupos_inscritos = session.exec(
+        select(Grupo).join(Inscripcion, Grupo.id == Inscripcion.id_grupo).where(
+            Inscripcion.id_estudiante == est.id
+        )
+    ).all()
+
+    franjas_ocupadas: set = set()
+    for g in grupos_inscritos:
+        if g.dia  and g.hora:  franjas_ocupadas.add((g.dia,  g.hora))
+        if g.dia2 and g.hora2: franjas_ocupadas.add((g.dia2, g.hora2))
+
+    def _tiene_conflicto(hora: str, dia1: str, dia2: str) -> bool:
+        return (dia1, hora) in franjas_ocupadas or (dia2, hora) in franjas_ocupadas
+
+    grupos_existentes = session.exec(
+        select(Grupo).where(Grupo.id_materia == data.id_materia)
+    ).all()
+    for g in grupos_existentes:
+        if g.dia and g.hora and g.dia2 and g.hora2:
+            if _tiene_conflicto(g.hora, g.dia, g.dia2):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Conflicto de horario: ya tienes clase los "
+                        f"{g.dia} o {g.dia2} a las {_hora_display(g.hora)}. "
+                        "Elige otra jornada o materia."
+                    )
+                )
     profesorAs = _buscar_profesor(session, materia.facultad)
     id_prof    = profesorAs.id if profesorAs else None
     prefSal    = FACULTAD_A_SALON.get(materia.facultad, "AULA-%")

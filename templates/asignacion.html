@@ -835,22 +835,10 @@
     }
   }
 
-  /* ── SEDE ROTANTE sidebar ── */
-  const SEDES_SB = ['Sede Principal','Sede Las Torres','Sede Claustro','Sede El Lago'];
-  let sedeIdxSb = 0;
-  function rotarSedeSb() {
-    const el = document.getElementById('sede-sb');
-    if (!el) return;
-    el.style.opacity = '0';
-    setTimeout(() => {
-      el.innerText = SEDES_SB[sedeIdxSb % SEDES_SB.length];
-      el.style.opacity = '1';
-      sedeIdxSb++;
-    }, 350);
-  }
+  /* ── SEDE sidebar ── */
   document.addEventListener('DOMContentLoaded', () => {
-    rotarSedeSb();
-    setInterval(rotarSedeSb, 4000);
+    const el = document.getElementById('sede-sb');
+    if (el) el.innerText = 'Sede Principal';
   });
 
   /* ── Cerrar sesion ── */

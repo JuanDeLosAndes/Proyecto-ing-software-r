@@ -84,6 +84,11 @@ def CambiarContrasena(
             status_code=404,
             detail="No existe un usuario con ese codigo institucional."
         )
+    if us.contrasena == data.nueva_contrasena:
+        raise HTTPException(
+            status_code=400,
+            detail="La nueva contrasena no puede ser igual a la contrasena actual."
+        )
     us.contrasena = data.nueva_contrasena
     session.add(us)
     session.commit()
