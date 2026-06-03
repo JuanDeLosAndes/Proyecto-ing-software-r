@@ -19,7 +19,7 @@ class ConexionBD:
 
 
 def CrearTa():
-    SQLModel.metadata.create_all(ConexionBD.ObtenerMotor())
+    SQLModel.metadata.create_all(ConexionBD.ObtenerMotor(), checkfirst=True)
 
 
 def ObtenerSes():
