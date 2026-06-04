@@ -12,11 +12,7 @@ IMG_DIR = os.path.join("static", "img")
 
 
 def _guardar_imagen_base64(data_url: str, slot: int) -> str:
-    """
-    Si el valor es un data-URL base64, lo guarda en static/img/ y retorna
-    la ruta /static/img/... para que persista entre sesiones.
-    Si es URL normal (http/https) la retorna sin cambios.
-    """
+
     if not data_url or not data_url.strip():
         return data_url
 

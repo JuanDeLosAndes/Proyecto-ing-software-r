@@ -95,14 +95,32 @@ def _salon_libre(session: Session, pref: str, fallback: str, ocupados: set):
     return sal
 
 
+def _franjas_ya_usadas_globalmente(session: Session) -> set:
+    """
+    Retorna el conjunto de (dia, hora) que ya tiene al menos un grupo asignado.
+    Incluye sesion_1 y sesion_2 de todos los grupos existentes.
+    Sirve para que cada nueva materia reciba una franja distinta.
+    """
+    usadas: set = set()
+    grupos = session.exec(select(Grupo)).all()
+    for g in grupos:
+        if g.dia  and g.hora:  usadas.add((g.dia,  g.hora))
+        if g.dia2 and g.hora2: usadas.add((g.dia2, g.hora2))
+    return usadas
+
+
 def _buscar_franja_con_salones(session: Session, prefSal: str,
-                                facultad: str, jornada: str = "manana"):
+                                facultad: str, jornada: str = "manana",
+                                franjas_bloqueadas: set = None):
     """
     SRP: encuentra la primera franja disponible con salones libres para 2 sesiones.
     OCP: agregar jornadas nuevas = agregar entradas en los diccionarios.
+    franjas_bloqueadas: set de (dia, hora) que NO se pueden usar (horario del estudiante
+                        o franjas ya ocupadas globalmente).
     Retorna (hora, dia1, id_salon1, dia2, id_salon2) o None.
     """
     fallback = "AULA-%" if facultad == "Sistemas" else None
+    bloqueadas = franjas_bloqueadas or set()
 
     if jornada == "sabado":
         franjas = FRANJAS_SABADO
@@ -116,6 +134,9 @@ def _buscar_franja_con_salones(session: Session, prefSal: str,
 
     for hora in franjas:
         for dia1, dia2 in pares:
+            # Saltar si dia1+hora o dia2+hora ya están bloqueadas
+            if (dia1, hora) in bloqueadas or (dia2, hora) in bloqueadas:
+                continue
             ocup1 = _salones_ocupados_en(session, dia1, hora)
             ocup2 = _salones_ocupados_en(session, dia2, hora) if dia2 != dia1 else ocup1
             sal1  = _salon_libre(session, prefSal, fallback, ocup1)
@@ -284,35 +305,48 @@ def InscribirEst(
     ).first():
         raise HTTPException(status_code=409, detail="Ya estas matriculado en esta materia.")
 
-    # ── Validacion de conflicto horario ──────────────────────────────
+    # ── Franjas ya ocupadas por este estudiante ───────────────────────
     grupos_inscritos = session.exec(
         select(Grupo).join(Inscripcion, Grupo.id == Inscripcion.id_grupo).where(
             Inscripcion.id_estudiante == est.id
         )
     ).all()
 
-    franjas_ocupadas: set = set()
+    franjas_estudiante: set = set()
     for g in grupos_inscritos:
-        if g.dia  and g.hora:  franjas_ocupadas.add((g.dia,  g.hora))
-        if g.dia2 and g.hora2: franjas_ocupadas.add((g.dia2, g.hora2))
+        if g.dia  and g.hora:  franjas_estudiante.add((g.dia,  g.hora))
+        if g.dia2 and g.hora2: franjas_estudiante.add((g.dia2, g.hora2))
 
     def _tiene_conflicto(hora: str, dia1: str, dia2: str) -> bool:
-        return (dia1, hora) in franjas_ocupadas or (dia2, hora) in franjas_ocupadas
+        return (dia1, hora) in franjas_estudiante or (dia2, hora) in franjas_estudiante
 
+    # ── Validacion: grupos existentes de esta materia vs horario del estudiante ──
     grupos_existentes = session.exec(
         select(Grupo).where(Grupo.id_materia == data.id_materia)
     ).all()
-    for g in grupos_existentes:
-        if g.dia and g.hora and g.dia2 and g.hora2:
-            if _tiene_conflicto(g.hora, g.dia, g.dia2):
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        f"Conflicto de horario: ya tienes clase los "
-                        f"{g.dia} o {g.dia2} a las {_hora_display(g.hora)}. "
-                        "Elige otra jornada o materia."
-                    )
-                )
+    todos_con_conflicto = [
+        g for g in grupos_existentes
+        if g.dia and g.hora and g.dia2 and g.hora2
+        and _tiene_conflicto(g.hora, g.dia, g.dia2)
+    ]
+    # Si TODOS los grupos disponibles chocan, no hay salida — rechazar
+    grupos_sin_conflicto = [
+        g for g in grupos_existentes
+        if g.dia and g.hora and g.dia2 and g.hora2
+        and not _tiene_conflicto(g.hora, g.dia, g.dia2)
+    ]
+    if grupos_existentes and not grupos_sin_conflicto:
+        g = todos_con_conflicto[0]
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Conflicto de horario: todos los grupos de '{materia.nombre}' "
+                f"coinciden con clases que ya tienes. "
+                f"El grupo 1 es {g.dia}/{g.dia2} a las {_hora_display(g.hora)}. "
+                "Elige otra jornada o materia."
+            )
+        )
+
     profesorAs = _buscar_profesor(session, materia.facultad)
     id_prof    = profesorAs.id if profesorAs else None
     prefSal    = FACULTAD_A_SALON.get(materia.facultad, "AULA-%")
@@ -320,18 +354,34 @@ def InscribirEst(
     grupos     = session.exec(select(Grupo).where(Grupo.id_materia == data.id_materia)).all()
     jornada    = data.jornada or "manana"
 
+    # Franjas globalmente ocupadas (para que cada materia nueva quede en franja distinta)
+    franjas_globales = _franjas_ya_usadas_globalmente(session)
+    # Al crear un grupo nuevo, bloqueamos tanto las del estudiante como las globales
+    franjas_bloqueadas_nuevo = franjas_estudiante | franjas_globales
+
     def _crear_grupo(numero: int) -> Grupo:
         """
-        SRP: fabrica interna que crea el grupo con ambas sesiones
-        usando el Builder completo (sin asignacion externa).
+        SRP: fabrica interna que crea el grupo con ambas sesiones usando el Builder.
+        Pasa franjas_bloqueadas para que el nuevo grupo NO caiga en una franja
+        ya usada por otro grupo existente NI por el horario del estudiante.
         """
-        franja = _buscar_franja_con_salones(session, prefSal, materia.facultad, jornada)
+        franja = _buscar_franja_con_salones(
+            session, prefSal, materia.facultad, jornada,
+            franjas_bloqueadas=franjas_bloqueadas_nuevo
+        )
         if not franja:
-            franja = _buscar_franja_con_salones(session, prefSal, materia.facultad, "manana")
+            # Fallback: ignorar globales pero respetar las del estudiante
+            franja = _buscar_franja_con_salones(
+                session, prefSal, materia.facultad, "manana",
+                franjas_bloqueadas=franjas_estudiante
+            )
         if not franja:
             raise HTTPException(
                 status_code=400,
-                detail="No hay franjas horarias disponibles con salones libres para 2 sesiones."
+                detail=(
+                    "No hay franjas horarias disponibles sin conflicto "
+                    "con tu horario actual. Intenta con otra jornada."
+                )
             )
         hora, dia1, id_sal1, dia2, id_sal2 = franja
         return (ConstructorGrup()
@@ -357,12 +407,32 @@ def InscribirEst(
                     status_code=400,
                     detail="El grupo seleccionado no es valido para esta materia."
                 )
+            # Validar que el grupo elegido manualmente no choque
+            if grupoEleg.dia and grupoEleg.hora and _tiene_conflicto(grupoEleg.hora, grupoEleg.dia, grupoEleg.dia2 or grupoEleg.dia):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"El grupo {grupoEleg.num_grupo} choca con tu horario actual "
+                        f"({grupoEleg.dia}/{grupoEleg.dia2} a las {_hora_display(grupoEleg.hora)}). "
+                        "Elige otro grupo o jornada."
+                    )
+                )
         else:
-            grupoEleg = ContextoIns(EstrategiaVac()).seleccionar(list(grupos), session)
+            # Elegir el primer grupo sin conflicto con el estudiante
+            if grupos_sin_conflicto:
+                grupoEleg = ContextoIns(EstrategiaVac()).seleccionar(grupos_sin_conflicto, session)
+            else:
+                # No habia grupos previos con horario asignado — crear uno nuevo libre
+                grupoEleg = _crear_grupo(len(grupos) + 1)
+                session.add(grupoEleg)
+                session.commit()
+                session.refresh(grupoEleg)
+                inscritos = 0
 
-        inscritos = session.exec(
-            select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == grupoEleg.id)
-        ).one()
+        if 'inscritos' not in dir():
+            inscritos = session.exec(
+                select(func.count(Inscripcion.id)).where(Inscripcion.id_grupo == grupoEleg.id)
+            ).one()
 
     if inscritos >= limiteC:
         nuevoGrup = _crear_grupo(len(grupos) + 1)
@@ -413,4 +483,5 @@ def ActualizarEstado(
     insc.aprobada = aprobada
     insc.estado   = "Aprobado" if aprobada else "Reprobado"
     session.add(insc)
-    session.c
+    session.commit()
+    return {"mensaje": "Estado actualizado correctamente."}
