@@ -18,11 +18,7 @@ ESPECIALIDAD_A_FACULTAD = {
 
 
 def _asignar_profe_pendiente(session: Session, facultad: str) -> None:
-    """
-    SRP: asigna profesor a grupos huerfanos de esa facultad.
-    Movido aqui para eliminar el import circular con inscripcionCtrl.
-    DIP: recibe session inyectada.
-    """
+
     from modelos.entidades import Grupo, Materia
     especialidad_map = {
         "Sistemas":         "Ingeniería de Sistemas",
@@ -73,7 +69,7 @@ def CerrarSes(token: str, session: Session = Depends(ObtenerSes)):
     return {"mensaje": "Sesion cerrada correctamente."}
 
 
-@router.post("/usuarios/cambiar-contrasena", status_code=200)
+@router.post("/usuarios/cambiar-contraseña", status_code=200)
 def CambiarContrasena(
     data: EsquemaCambioContrasena,
     session: Session = Depends(ObtenerSes)
@@ -149,8 +145,7 @@ def RegistrarUs(data: EsquemaRegistro, session: Session = Depends(ObtenerSes)):
         }
         nuevoUs = CreadorUs.RegistrarUs(session, data.rol_nombre, creds, perfilDatos)
 
-        # SRP corregido: _asignar_profe_pendiente vive aqui, no en inscripcionCtrl
-        # Elimina el import circular que existia antes
+
         if data.rol_nombre == "Profesor":
             facultad = ESPECIALIDAD_A_FACULTAD.get(
                 data.especialidad.strip() if data.especialidad else ""
@@ -170,7 +165,7 @@ def AgregarUsuarioAdmin(
     sesion: SesionToken = Depends(ObtenerSesAct),
     session: Session = Depends(ObtenerSes)
 ):
-    """Endpoint exclusivo para administradores."""
+
     if sesion.rol != "Administrador":
         raise HTTPException(status_code=403, detail="Solo los administradores pueden agregar usuarios.")
     return RegistrarUs(data, session)
